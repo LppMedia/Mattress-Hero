@@ -29,6 +29,21 @@ const DECORATIONS = [
     "con carteles de 'OFERTA' estilo cómic al fondo"
 ];
 
+// Helper to safely get the API key in both Vite (browser) and Node environments
+const getApiKey = () => {
+    // Check for Vite environment variable
+    // @ts-ignore
+    const viteKey = typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env.VITE_GOOGLE_API_KEY || import.meta.env.API_KEY) : undefined;
+    if (viteKey) return viteKey;
+
+    // Check for process.env
+    if (typeof process !== 'undefined' && process.env) {
+        return process.env.API_KEY;
+    }
+    
+    return undefined;
+};
+
 export const generateScenePrompt = async (imageBase64?: string): Promise<string> => {
     const fallback = () => {
         const style = SCENE_STYLES[Math.floor(Math.random() * SCENE_STYLES.length)];
@@ -38,10 +53,11 @@ export const generateScenePrompt = async (imageBase64?: string): Promise<string>
         return `Show this mattress placed on a ${floor} in ${style}, ${decor}. Photorealistic, bright lighting, wide angle, high quality. Keep the mattress looking exactly the same as the input image.`;
     };
 
-    if (!imageBase64 || !process.env.API_KEY) return fallback();
+    const apiKey = getApiKey();
+    if (!imageBase64 || !apiKey) return fallback();
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: {
@@ -61,9 +77,11 @@ export const generateScenePrompt = async (imageBase64?: string): Promise<string>
 };
 
 export const analyzeMattressImage = async (imageBase64: string): Promise<{ brand?: string, size?: string, condition?: string, price?: number } | null> => {
-     if (!process.env.API_KEY) return null;
+     const apiKey = getApiKey();
+     if (!apiKey) return null;
+     
      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: {
@@ -95,12 +113,13 @@ export const analyzeMattressImage = async (imageBase64: string): Promise<{ brand
 
 export const enhanceMattressImage = async (imageBase64: string, prompt: string): Promise<string | null> => {
     try {
-        if (!process.env.API_KEY) {
+        const apiKey = getApiKey();
+        if (!apiKey) {
             console.error("Missing API_KEY for Gemini");
             throw new Error("API Key missing");
         }
 
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         
         // Using gemini-2.5-flash-image for general image editing tasks as per guidance
         const response = await ai.models.generateContent({
