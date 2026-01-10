@@ -1,0 +1,7 @@
+{
+  "name": "Mattress Hero",
+  "description": "A comic-book styled inventory management app for mattress stores, featuring AI-powered scene generation.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
