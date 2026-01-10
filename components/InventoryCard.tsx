@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
-import { Box, DollarSign, Trash2, MapPin, Truck, CheckCircle, Edit, RefreshCw, ArrowRightLeft, Sun, X, AlertCircle, Layers } from 'lucide-react';
+import { Box, DollarSign, Trash2, MapPin, Truck, CheckCircle, Edit, RefreshCw, ArrowRightLeft, Sun, X, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { InventoryItem } from '../types';
 import { inventoryService } from '../services/inventoryService';
 
 interface InventoryCardProps {
     item: InventoryItem;
-    groupedItems?: InventoryItem[]; // New prop for stacks
+    groupedItems?: InventoryItem[]; // If present, this card represents a stack
     isSalesMode?: boolean;
     onEdit?: (item: InventoryItem) => void;
+    isChild?: boolean; // New prop to style inner items differently
 }
 
-export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems = [], isSalesMode, onEdit }) => {
+export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems = [], isSalesMode, onEdit, isChild = false }) => {
     const [isSelling, setIsSelling] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isMoving, setIsMoving] = useState(false); 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+
     const [saleForm, setSaleForm] = useState({
         customerName: '',
         deliveryMethod: 'Pickup' as 'Pickup' | 'Delivery',
@@ -25,14 +28,28 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
     const isSold = item.status === 'Sold';
     const isAvailable = item.status === 'Available';
     const stackCount = groupedItems.length > 0 ? groupedItems.length : 1;
+    const isStack = stackCount > 1;
     
     // Quick locations for the Move modal
     const QUICK_LOCATIONS = ["Flea Market", "Showroom", "Unit 1", "Unit 2", "Unit 3", "Unit 4", "Unit 5"];
 
     // Helper: Get the ID to operate on (pop one from stack if multiple, otherwise use item.id)
     const getTargetId = () => {
+        // If it's a stack (Parent) and we perform an action, we usually target the first one 
+        // OR we rely on the expanded view to target specific IDs. 
+        // For the main card quick-actions, we target the first available.
         return groupedItems.length > 0 ? groupedItems[0].id : item.id;
     }
+
+    const toggleExpand = (e: React.MouseEvent) => {
+        if (!isStack) return;
+        // Don't toggle if clicking buttons
+        if ((e.target as HTMLElement).closest('button')) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        setIsExpanded(!isExpanded);
+    };
 
     const handleConfirmSale = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -130,7 +147,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                         <AlertCircle size={42} className="text-red-600" strokeWidth={2.5} />
                     </div>
                     <p className="text-black text-sm font-medium leading-tight">
-                        {stackCount > 1 
+                        {isStack 
                             ? `¿Eliminar 1 unidad de ${stackCount}? (Solo se borra una)`
                             : "¿Quieres Remover esto de tu inventario?"
                         }
@@ -159,16 +176,16 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
     // --- MOVE MODAL OVERLAY ---
     if (isMoving) {
         return (
-            <div className="bg-yellow-50 border-4 border-black rounded-xl p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] relative">
+            <div className="bg-yellow-50 border-4 border-black rounded-xl p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] relative z-20">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bangers text-xl flex items-center gap-2">
                         <MapPin className="text-[#6200EA]" /> 
-                        {stackCount > 1 ? "MOVER 1 UNIDAD A:" : "MOVER ÍTEM A:"}
+                        {isStack ? "MOVER 1 UNIDAD A:" : "MOVER ÍTEM A:"}
                     </h3>
                     <button onClick={() => setIsMoving(false)} className="text-gray-400 font-bold hover:text-black">X</button>
                 </div>
                 
-                {stackCount > 1 && (
+                {isStack && (
                     <div className="mb-2 text-xs font-bold text-gray-500 bg-white border border-black p-1">
                         📦 Moviendo 1 de {stackCount} ítems idénticos.
                     </div>
@@ -210,10 +227,10 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
     // --- SALE FORM OVERLAY ---
     if (isSelling) {
         return (
-            <div className="bg-white border-4 border-black rounded-xl p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+            <div className="bg-white border-4 border-black rounded-xl p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] relative z-20">
                 <div className="flex justify-between items-center mb-2">
                     <h3 className="font-bangers text-xl text-[#FF6D00]">
-                        {stackCount > 1 ? "VENDER 1 UNIDAD" : "DATOS DE VENTA"}
+                        {isStack ? "VENDER 1 UNIDAD" : "DATOS DE VENTA"}
                     </h3>
                     <button onClick={() => setIsSelling(false)} className="text-gray-400 font-bold hover:text-black">X</button>
                 </div>
@@ -264,21 +281,33 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
 
     // --- NORMAL CARD ---
     return (
-        <>
+        <div className={`relative ${isChild ? 'ml-6 mb-2' : ''}`}>
             {showDeleteModal && <DeleteModal />}
             
-            {/* STACK EFFECT BACKGROUND if count > 1 */}
-            {stackCount > 1 && (
+            {/* Visual connector line for child items */}
+            {isChild && (
+                <div className="absolute -left-4 top-1/2 w-4 h-[2px] bg-black border-b-2 border-black"></div>
+            )}
+            {isChild && (
+                <div className="absolute -left-4 -top-6 bottom-1/2 w-[2px] bg-black"></div>
+            )}
+
+            {/* STACK EFFECT BACKGROUND (Only for Top Level Stacks when collapsed) */}
+            {isStack && !isExpanded && !isChild && (
                  <div className="mx-2 -mb-28 h-32 bg-gray-800 border-4 border-black rounded-xl translate-y-2 relative z-0"></div>
             )}
 
-            <div className={`
-                relative bg-white border-4 border-black rounded-xl overflow-hidden
-                shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]
-                transition-all duration-300 z-10
-                ${!isAvailable ? 'bg-gray-50' : 'hover:-translate-y-1'}
-                ${isDeleting ? 'opacity-50 pointer-events-none' : ''}
-            `}>
+            <div 
+                onClick={toggleExpand}
+                className={`
+                    relative bg-white border-4 border-black rounded-xl overflow-hidden
+                    ${isChild ? 'shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] border-2 scale-[0.98]' : 'shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]'}
+                    transition-all duration-300 z-10
+                    ${!isAvailable ? 'bg-gray-50' : isStack ? 'cursor-pointer hover:-translate-y-1' : ''}
+                    ${isDeleting ? 'opacity-50 pointer-events-none' : ''}
+                    ${isExpanded ? 'mb-4' : ''}
+                `}
+            >
                 {/* Status Badge */}
                 <div className={`
                     absolute top-3 right-3 z-10 px-3 py-1 border-2 border-black font-bangers rotate-3 shadow-md
@@ -289,7 +318,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
 
                 <div className="flex h-32">
                     {/* Image Section */}
-                    <div className="w-1/3 border-r-4 border-black relative bg-gray-100 overflow-hidden">
+                    <div className="w-1/3 border-r-4 border-black relative bg-gray-100 overflow-hidden group">
                         {item.image ? (
                             <img src={item.image} className={`w-full h-full object-cover ${!isAvailable ? 'grayscale' : ''}`} alt="Mattress" />
                         ) : (
@@ -299,8 +328,9 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                         )}
                         
                         {/* Stack Count Badge on Image */}
-                        {stackCount > 1 && (
-                             <div className="absolute top-1 right-1 bg-[#6200EA] text-white border-2 border-black px-1.5 font-bangers text-lg shadow-sm z-20">
+                        {isStack && !isChild && (
+                             <div className="absolute top-1 right-1 bg-[#6200EA] text-white border-2 border-black px-1.5 font-bangers text-lg shadow-sm z-20 flex items-center gap-1">
+                                 {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
                                  x{stackCount}
                              </div>
                         )}
@@ -318,29 +348,40 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                                 </h3>
                             </div>
                             
-                            {/* Quantity Indicator in Details as requested */}
-                             {stackCount > 1 && (
+                            {/* Quantity Indicator in Details */}
+                             {isStack && !isChild && (
                                 <div className="flex items-center gap-1 mt-1">
                                     <span className="text-xs font-bold text-gray-500">CANTIDAD:</span>
-                                    <span className="bg-black text-white px-2 rounded font-bangers text-sm">
+                                    <span className={`bg-black text-white px-2 rounded font-bangers text-sm flex items-center gap-1 ${isExpanded ? 'bg-[#6200EA]' : ''}`}>
                                         {stackCount} UNIDADES
+                                        {isExpanded && <span className="text-[10px] font-sans opacity-80">(Abierto)</span>}
                                     </span>
+                                </div>
+                            )}
+
+                            {/* Show specific SKU if it is a child or single item */}
+                            {(isChild || !isStack) && (
+                                <div className="text-[10px] font-bold bg-gray-100 inline-block px-1 border border-gray-300 mt-1 text-gray-500">
+                                    ID: {item.sku || 'N/A'}
                                 </div>
                             )}
 
                             <p className="font-bold text-gray-500 text-sm uppercase mt-1">{item.size} • {item.condition}</p>
                             
-                            {/* Storage Unit Badge */}
-                            {item.storageLocation && (
-                                <div className={`inline-flex items-center gap-1 border border-black px-1.5 rounded mt-1 ${item.storageLocation === 'Flea Market' ? 'bg-[#FF6D00] text-white animate-pulse' : 'bg-yellow-200 text-black'}`}>
-                                    <MapPin size={10} />
-                                    <span className="font-bold text-[10px] uppercase">{item.storageLocation}</span>
-                                </div>
-                            )}
                         </div>
                         
-                        <div className="flex justify-between items-end mt-2">
-                            <span className={`font-bangers text-3xl drop-shadow-[1px_1px_0_#000] ${isAvailable ? 'text-[#FF6D00]' : 'text-gray-500'}`}>
+                        {/* Combined Location & Price Row */}
+                        <div className="flex items-end justify-between mt-1">
+                             <div>
+                                {item.storageLocation && (
+                                    <div className={`inline-flex items-center gap-1 border border-black px-1.5 rounded ${item.storageLocation === 'Flea Market' ? 'bg-[#FF6D00] text-white animate-pulse' : 'bg-yellow-200 text-black'}`}>
+                                        <MapPin size={10} />
+                                        <span className="font-bold text-[10px] uppercase">{item.storageLocation}</span>
+                                    </div>
+                                )}
+                             </div>
+
+                            <span className={`font-bangers text-3xl drop-shadow-[1px_1px_0_#000] leading-none ${isAvailable ? 'text-[#FF6D00]' : 'text-gray-500'}`}>
                                 ${item.price}
                             </span>
                         </div>
@@ -360,7 +401,8 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                     </div>
                 )}
 
-                {/* Actions Footer */}
+                {/* Actions Footer - If expanded, we generally hide buttons on parent to avoid confusion, 
+                    OR we keep them as "Action on First Available". Keeping them for now but specific cards inside work too. */}
                 <div className="bg-gray-50 border-t-4 border-black p-2 flex gap-2">
                     {isAvailable ? (
                         isSalesMode ? (
@@ -369,7 +411,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                                 onClick={() => setIsSelling(true)}
                                 className="flex-1 bg-[#6200EA] text-white border-2 border-black py-2 font-bangers tracking-wide flex items-center justify-center gap-2 hover:bg-[#5000ca] active:bg-[#6200EA]"
                             >
-                                <DollarSign size={18} /> {stackCount > 1 ? "VENDER (1)" : "VENDER"}
+                                <DollarSign size={18} /> {isStack && !isChild ? "VENDER (1)" : "VENDER"}
                             </button>
                         ) : (
                             <>
@@ -435,6 +477,25 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                     )}
                 </div>
             </div>
-        </>
+
+            {/* EXPANDED CHILDREN LIST */}
+            {isExpanded && isStack && (
+                <div className="pl-4 pr-1 mt-2 space-y-3 animate-fade-in relative z-0">
+                    {/* Dashed connector line */}
+                    <div className="absolute left-0 top-0 bottom-6 w-0.5 bg-black border-l-2 border-dashed border-gray-400"></div>
+
+                    {groupedItems.map((subItem) => (
+                        <InventoryCard
+                            key={subItem.id}
+                            item={subItem}
+                            groupedItems={[]} // IMPORTANT: Pass empty array so children act as single items
+                            isSalesMode={isSalesMode}
+                            onEdit={onEdit}
+                            isChild={true}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
     );
 };

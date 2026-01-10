@@ -235,19 +235,21 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           
-          {/* AUTO FILL BUTTON */}
-          <button
-            type="button"
-            onClick={handleAutoIdentify}
-            disabled={isAnalyzing || !imagePreview}
-            className={`
-                w-full border-2 border-black p-2 flex items-center justify-center gap-2 font-bangers text-xl shadow-[4px_4px_0px_0px_#000] active:shadow-none active:translate-y-1 transition disabled:opacity-50 disabled:cursor-not-allowed
-                ${!imagePreview ? 'bg-gray-200 text-gray-500' : 'bg-[#00E676]'}
-            `}
-          >
-              <Sparkles className={isAnalyzing ? "animate-spin" : ""} />
-              {isAnalyzing ? "ANALIZANDO IMAGEN..." : (!imagePreview ? "AUTO-DETECT (REQ. FOTO)" : "⚡ AUTO-DETECTAR DATOS")}
-          </button>
+          {/* AUTO FILL BUTTON - Only show if NOT editing (adding new) */}
+          {!initialItem && (
+            <button
+                type="button"
+                onClick={handleAutoIdentify}
+                disabled={isAnalyzing || !imagePreview}
+                className={`
+                    w-full border-2 border-black p-2 flex items-center justify-center gap-2 font-bangers text-xl shadow-[4px_4px_0px_0px_#000] active:shadow-none active:translate-y-1 transition disabled:opacity-50 disabled:cursor-not-allowed
+                    ${!imagePreview ? 'bg-gray-200 text-gray-500' : 'bg-[#00E676]'}
+                `}
+            >
+                <Sparkles className={isAnalyzing ? "animate-spin" : ""} />
+                {isAnalyzing ? "ANALIZANDO IMAGEN..." : (!imagePreview ? "AUTO-DETECT (REQ. FOTO)" : "⚡ AUTO-DETECTAR DATOS")}
+            </button>
+          )}
 
           <div>
             <label className="font-bangers block mb-1">TAMAÑO</label>
