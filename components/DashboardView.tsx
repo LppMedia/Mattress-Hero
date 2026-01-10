@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, DollarSign, Database, X, Calendar, ClipboardList } from 'lucide-react';
+import { Box, DollarSign, Database, X, Calendar, ClipboardList, Trash2, AlertCircle } from 'lucide-react';
 import { InventoryItem, ViewState } from '../types';
 import { ComicText, ComicButton, StatCard } from './UIComponents';
 import { inventoryService } from '../services/inventoryService';
@@ -12,6 +12,10 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView }) => {
   const [seeding, setSeeding] = useState(false);
   const [showSalesHistory, setShowSalesHistory] = useState(false);
+  
+  // State for deletion logic
+  const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const totalItems = inventory.filter(i => i.status === 'Available').length;
   
@@ -32,69 +36,142 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView
     setSeeding(false);
   };
 
-  // --- SALES HISTORY MODAL ---
-  const SalesHistoryModal = () => (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setShowSalesHistory(false)}>
-          <div className="bg-white border-4 border-black rounded-xl w-full max-w-lg h-[80vh] flex flex-col shadow-[8px_8px_0px_0px_#FF6D00]" onClick={e => e.stopPropagation()}>
-              
-              {/* Header */}
-              <div className="bg-[#6200EA] p-4 flex justify-between items-center border-b-4 border-black">
-                  <div className="flex items-center gap-2 text-white">
-                      <DollarSign size={28} strokeWidth={3} />
-                      <span className="font-bangers text-2xl tracking-wide">HISTORIAL DE VENTAS</span>
-                  </div>
-                  <button onClick={() => setShowSalesHistory(false)} className="text-white hover:text-red-300">
-                      <X size={28} strokeWidth={3} />
-                  </button>
-              </div>
-
-              {/* Total Banner */}
-              <div className="bg-green-100 p-3 border-b-4 border-black text-center">
-                  <span className="font-bold text-gray-600 text-sm uppercase">Total Generado</span>
-                  <div className="font-bangers text-4xl text-[#00E676] drop-shadow-[1px_1px_0_#000]">
-                      ${totalSoldValue.toLocaleString()}
-                  </div>
-              </div>
-
-              {/* Scrollable List */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-yellow-50">
-                  {soldItems.length === 0 ? (
-                      <div className="text-center opacity-50 mt-10">
-                          <div className="font-bangers text-xl">SIN VENTAS AÚN</div>
-                          <p className="text-sm font-bold">¡Empieza a vender para llenar este historial!</p>
-                      </div>
-                  ) : (
-                      // Sort by most recent (assuming created_at is the proxy for now)
-                      soldItems.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).map(item => (
-                          <div key={item.id} className="bg-white border-2 border-black p-3 rounded shadow-[3px_3px_0px_0px_rgba(0,0,0,0.2)] flex justify-between items-center">
-                              <div>
-                                  <div className="flex items-center gap-1 text-xs font-bold text-gray-400 mb-1">
-                                      <Calendar size={10} />
-                                      {/* Using created_at as date placeholder. In a real app, use sold_at */}
-                                      {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Fecha desc.'}
-                                  </div>
-                                  <div className="font-bangers text-lg leading-none text-black">{item.brand}</div>
-                                  <div className="text-xs font-bold uppercase text-gray-500 mt-1">
-                                      {item.size} • {item.customerName || 'Cliente Anónimo'}
-                                  </div>
-                              </div>
-                              <div className="flex flex-col items-end">
-                                  <span className="font-bangers text-2xl text-[#FF6D00]">${item.price}</span>
-                                  <span className="text-[10px] font-bold bg-gray-200 px-1 rounded border border-black">
-                                      {item.deliveryMethod === 'Delivery' ? 'ENVÍO' : 'RETIRO'}
-                                  </span>
-                              </div>
-                          </div>
-                      ))
-                  )}
-              </div>
-          </div>
-      </div>
-  );
+  const handleDeleteSale = async () => {
+      if (!saleToDelete) return;
+      setIsDeleting(true);
+      try {
+          await inventoryService.delete(saleToDelete);
+          // The subscription in App.tsx will auto-refresh inventory
+          // We close the modal immediately or after a short delay? 
+          // Since the item will vanish from the list, closing immediately is fine.
+          setSaleToDelete(null); 
+      } catch (e) {
+          console.error("Failed to delete sale record", e);
+          alert("Error removing record");
+      } finally {
+          setIsDeleting(false);
+      }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in relative">
-      {showSalesHistory && <SalesHistoryModal />}
+      
+      {/* SALES HISTORY MODAL */}
+      {showSalesHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setShowSalesHistory(false)}>
+            <div className="bg-white border-4 border-black rounded-xl w-full max-w-lg h-[80vh] flex flex-col shadow-[8px_8px_0px_0px_#FF6D00]" onClick={e => e.stopPropagation()}>
+                
+                {/* Header */}
+                <div className="bg-[#6200EA] p-4 flex justify-between items-center border-b-4 border-black">
+                    <div className="flex items-center gap-2 text-white">
+                        <DollarSign size={28} strokeWidth={3} />
+                        <span className="font-bangers text-2xl tracking-wide">HISTORIAL DE VENTAS</span>
+                    </div>
+                    <button onClick={() => setShowSalesHistory(false)} className="text-white hover:text-red-300">
+                        <X size={28} strokeWidth={3} />
+                    </button>
+                </div>
+
+                {/* Total Banner */}
+                <div className="bg-green-100 p-3 border-b-4 border-black text-center">
+                    <span className="font-bold text-gray-600 text-sm uppercase">Total Generado</span>
+                    <div className="font-bangers text-4xl text-[#00E676] drop-shadow-[1px_1px_0_#000]">
+                        ${totalSoldValue.toLocaleString()}
+                    </div>
+                </div>
+
+                {/* Scrollable List */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-yellow-50">
+                    {soldItems.length === 0 ? (
+                        <div className="text-center opacity-50 mt-10">
+                            <div className="font-bangers text-xl">SIN VENTAS AÚN</div>
+                            <p className="text-sm font-bold">¡Empieza a vender para llenar este historial!</p>
+                        </div>
+                    ) : (
+                        // Sort by most recent
+                        soldItems.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).map(item => (
+                            <div key={item.id} className="bg-white border-2 border-black p-3 rounded shadow-[3px_3px_0px_0px_rgba(0,0,0,0.2)] flex justify-between items-center">
+                                <div>
+                                    <div className="flex items-center gap-1 text-xs font-bold text-gray-400 mb-1">
+                                        <Calendar size={10} />
+                                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Fecha desc.'}
+                                    </div>
+                                    <div className="font-bangers text-lg leading-none text-black">{item.brand}</div>
+                                    <div className="text-xs font-bold uppercase text-gray-500 mt-1">
+                                        {item.size} • {item.customerName || 'Cliente Anónimo'}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                    <span className="font-bangers text-2xl text-[#FF6D00]">${item.price}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold bg-gray-200 px-1 rounded border border-black">
+                                            {item.deliveryMethod === 'Delivery' ? 'ENVÍO' : 'RETIRO'}
+                                        </span>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSaleToDelete(item.id);
+                                            }}
+                                            className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded border border-transparent hover:border-red-200 transition-all"
+                                            title="Eliminar registro"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* RETRO DELETE MODAL */}
+      {saleToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-[1px]" onClick={(e) => e.stopPropagation()}>
+            <div className="w-[320px] bg-[#C0C0C0] border-t-2 border-l-2 border-t-white border-l-white border-b-2 border-r-2 border-b-black border-r-black shadow-2xl p-1 font-sans select-none" onClick={(e) => e.stopPropagation()}>
+                {/* Header */}
+                <div className="bg-[#000080] px-2 py-1 flex justify-between items-center mb-4 cursor-default">
+                    <span className="text-white font-bold text-sm tracking-wide">Confirmación</span>
+                    <button 
+                        onClick={() => setSaleToDelete(null)} 
+                        className="bg-[#C0C0C0] w-5 h-5 flex items-center justify-center border-t border-l border-t-white border-l-white border-b border-r border-b-black border-r-black active:border-t-black active:border-l-black active:border-b-white active:border-r-white focus:outline-none"
+                    >
+                        <X size={14} className="text-black" strokeWidth={3} />
+                    </button>
+                </div>
+                
+                {/* Content */}
+                <div className="flex items-center gap-4 px-4 py-2 mb-6">
+                    <div className="relative">
+                        <AlertCircle size={42} className="text-red-600" strokeWidth={2.5} />
+                    </div>
+                    <p className="text-black text-sm font-medium leading-tight">
+                        ¿Eliminar este registro de venta permanentemente?
+                    </p>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex justify-center gap-6 mb-4">
+                    <button 
+                        onClick={handleDeleteSale}
+                        disabled={isDeleting}
+                        className="w-20 py-1 bg-[#C0C0C0] text-black text-sm border-t-2 border-l-2 border-t-white border-l-white border-b-2 border-r-2 border-b-black border-r-black active:border-t-black active:border-l-black active:border-b-white active:border-r-white focus:outline-black focus:outline-dashed focus:outline-1 disabled:opacity-50"
+                    >
+                        {isDeleting ? '...' : 'Sí'}
+                    </button>
+                    <button 
+                        onClick={() => setSaleToDelete(null)}
+                        disabled={isDeleting}
+                        className="w-20 py-1 bg-[#C0C0C0] text-black text-sm border-t-2 border-l-2 border-t-white border-l-white border-b-2 border-r-2 border-b-black border-r-black active:border-t-black active:border-l-black active:border-b-white active:border-r-white focus:outline-black focus:outline-dashed focus:outline-1"
+                    >
+                        No
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <StatCard title="Total Stock" value={totalItems} icon={Box} color="bg-[#FF6D00]" />

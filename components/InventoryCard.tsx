@@ -22,7 +22,8 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
     const [saleForm, setSaleForm] = useState({
         customerName: '',
         deliveryMethod: 'Pickup' as 'Pickup' | 'Delivery',
-        deliveryAddress: ''
+        deliveryAddress: '',
+        salePrice: item.price.toString() // Initialize with current price
     });
 
     const isSold = item.status === 'Sold';
@@ -60,12 +61,15 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
         try {
              // We only sell ONE item from the stack
              const targetId = getTargetId();
+             
+             const finalPrice = parseFloat(saleForm.salePrice);
 
              const { error } = await inventoryService.update(targetId, { 
                  status: 'Sold',
                  customerName: saleForm.customerName,
                  deliveryMethod: saleForm.deliveryMethod,
-                 deliveryAddress: saleForm.deliveryAddress
+                 deliveryAddress: saleForm.deliveryAddress,
+                 price: isNaN(finalPrice) ? item.price : finalPrice // Update the price to the negotiated amount
              });
              
              if (error) throw error;
@@ -267,12 +271,24 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                         />
                     )}
 
+                    {/* NEW PRICE INPUT */}
+                    <div>
+                        <label className="font-bangers block mb-1 text-sm text-[#FF6D00]">PRECIO FINAL ($)</label>
+                        <input
+                            type="number"
+                            required
+                            className="w-full border-2 border-black p-2 font-bold text-2xl focus:ring-[#FF6D00] outline-none"
+                            value={saleForm.salePrice}
+                            onChange={e => setSaleForm({...saleForm, salePrice: e.target.value})}
+                        />
+                    </div>
+
                     <button 
                         type="submit"
                         disabled={isProcessing}
                         className="w-full bg-[#00E676] text-black border-2 border-black py-2 font-bangers text-xl hover:bg-[#00c853] shadow-[2px_2px_0px_0px_#000] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isProcessing ? "PROCESANDO..." : "CONFIRMAR ($)"}
+                        {isProcessing ? "PROCESANDO..." : "CONFIRMAR VENTA"}
                     </button>
                 </form>
             </div>

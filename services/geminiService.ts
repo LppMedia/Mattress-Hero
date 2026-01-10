@@ -1,32 +1,36 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
+// SCENES: Luxury penthouses with dramatic lighting and views.
 const SCENE_STYLES = [
-    "una tienda de colchones boutique con iluminación de estudio suave",
-    "un dormitorio principal minimalista de diseño escandinavo",
-    "un loft industrial luminoso con paredes de ladrillo visto",
-    "una habitación de invitados serena y decorada en tonos neutros",
-    "un showroom de muebles de diseño con grandes ventanales",
-    "una casa de campo moderna con vigas de madera expuestas",
-    "un apartamento urbano de lujo con vistas a la ciudad",
-    "una suite de hotel de 5 estrellas impecable",
-    "un estudio de fotografía profesional con fondo infinito blanco",
-    "un dormitorio acogedor estilo 'hygge' con luz natural suave"
+    "un dormitorio principal ultra-lujo en un ático con vistas panorámicas al skyline de la ciudad durante la puesta de sol",
+    "una suite de hotel de cinco estrellas espaciosa con ventanales de suelo a techo bañada en luz dorada del atardecer",
+    "un dormitorio moderno y sofisticado de diseño con vistas espectaculares a la ciudad y una iluminación ambiental cálida e integrada",
+    "un exclusivo apartamento en las alturas con una arquitectura impresionante y una atmósfera serena y opulenta al anochecer"
 ];
 
+// FLOORS: Premium, highly reflective or richly textured materials.
 const FLOOR_TYPES = [
-    "suelo de madera de roble de tablones anchos",
-    "alfombra de lana tejida de color crema",
-    "suelo de mármol blanco Carrara pulido",
-    "piso de microcemento alisado gris cálido",
-    "suelo de grandes baldosas de piedra natural mate"
+    "suelo de grandes baldosas de mármol blanco pulido con vetas grises que reflejan la luz",
+    "pavimento de madera noble oscura de tablón ancho con un acabado rico y elegante",
+    "una gran alfombra de área de textura suave y lujosa en tonos neutros sobre un suelo de madera",
+    "suelo de piedra natural pulida que aporta una sensación de grandiosidad"
 ];
 
+// DECORATIONS: Sophisticated elements that enhance the luxury feel.
 const DECORATIONS = [
-    "con una planta Ficus lyrata alta en una maceta de cerámica",
-    "con arte abstracto minimalista y enmarcado en la pared",
-    "con una mesita de noche de madera maciza y una lámpara de diseño",
-    "con cortinas de lino translúcido suavizando la luz de la ventana",
-    "con una manta de punto grueso doblada a los pies de la cama"
+    "con cortinas fluidas y transparentes que suavizan la luz dramática de la ventana",
+    "con una cama tapizada de diseño con un cabecero alto y elegante que enmarca el colchón",
+    "con mesitas de noche de mármol o madera oscura y lámparas de mesa esculturales de diseño",
+    "con iluminación LED cálida oculta en el techo o bajo la estructura de la cama para un efecto teatral",
+    "con obras de arte abstracto enmarcadas y una gran planta de interior escultural para un toque orgánico"
+];
+
+// PRODUCT PRESENTATION: The mattress is the centerpiece.
+const MATTRESS_PRESENTATION = [
+    "el colchón premium es el protagonista absoluto, presentado de forma impecable sobre una base elegante",
+    "la luz dramática del atardecer resalta las texturas y el diseño del tejido del colchón",
+    "el colchón puede estar desnudo para mostrar su calidad o vestido con ropa de cama minimalista de la más alta gama",
+    "la cama está perfectamente hecha, transmitiendo una sensación de confort y lujo inigualable"
 ];
 
 // Helper to safely get the API key in both Vite (browser) and Node environments
@@ -105,8 +109,9 @@ export const generateScenePrompt = async (imageBase64?: string): Promise<string>
         const style = SCENE_STYLES[Math.floor(Math.random() * SCENE_STYLES.length)];
         const floor = FLOOR_TYPES[Math.floor(Math.random() * FLOOR_TYPES.length)];
         const decor = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
+        const present = MATTRESS_PRESENTATION[Math.floor(Math.random() * MATTRESS_PRESENTATION.length)];
         
-        return `Show this mattress placed on a ${floor} in ${style}, ${decor}. Photorealistic, bright lighting, wide angle, high quality. Keep the mattress looking exactly the same as the input image.`;
+        return `A realistic photo of ${present} placed in ${style} with ${floor}. ${decor}. Photorealistic, 8k product photography, luxury penthouse, golden hour lighting.`;
     };
 
     const apiKey = getApiKey();
@@ -121,14 +126,14 @@ export const generateScenePrompt = async (imageBase64?: string): Promise<string>
             model: 'gemini-3-flash-preview',
             contents: {
                 parts: [
-                    { text: "Generate a creative, short prompt to place this mattress in a stunning, high-end realistic environment (like a luxury bedroom, scandinavian loft, or bright showroom). Describe the flooring, lighting, and decor. Keep it concise." },
+                    { text: "Generate a short prompt to place this mattress in a luxurious penthouse bedroom setting. Describe a spacious room with floor-to-ceiling windows offering a spectacular city skyline view during golden hour (sunset/sunrise). Include details about premium flooring, sophisticated decor (curtains, designer lamps, art), and a stylish bed frame or headboard. The lighting should be dramatic and warm. The mattress is the hero." },
                     { inlineData: { mimeType: "image/jpeg", data: optimizedImage } }
                 ]
             }
         });
         const text = response.text;
         if (!text) return fallback();
-        return `Show this mattress placed in ${text}. Photorealistic, high quality. Keep the mattress exactly as is.`;
+        return `A realistic photo of the mattress placed in ${text}. High-end luxury penthouse, golden hour lighting, dramatic and opulent.`;
     } catch (e) {
         console.warn("Gemini 3 Flash prompt gen failed, using fallback", e);
         return fallback();
