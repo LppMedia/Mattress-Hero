@@ -60,12 +60,48 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
     }
   };
 
+  // Helper to safely get base64 data from either Data URI or HTTP URL
+  const getBase64Data = async (): Promise<string | null> => {
+      if (!imagePreview) return null;
+      
+      if (imagePreview.startsWith('data:')) {
+          return imagePreview.split(',')[1];
+      }
+      
+      if (imagePreview.startsWith('http')) {
+          try {
+              const response = await fetch(imagePreview);
+              const blob = await response.blob();
+              return await new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                      const res = reader.result as string;
+                      resolve(res.split(',')[1]);
+                  };
+                  reader.readAsDataURL(blob);
+              });
+          } catch (e) {
+              console.error("Error fetching image for AI processing", e);
+              return null;
+          }
+      }
+      
+      return null;
+  };
+
   const generateAIBackground = async () => {
     if (!imagePreview) return;
     setIsEnhancing(true);
 
     try {
-        const base64Data = imagePreview.split(',')[1];
+        const base64Data = await getBase64Data();
+        
+        if (!base64Data) {
+            alert("No se pudo procesar la imagen (posible error de red o formato).");
+            setIsEnhancing(false);
+            return;
+        }
+
         // Now using async Gemini 3 Flash smart prompt
         const prompt = await generateScenePrompt(base64Data);
         
@@ -91,7 +127,14 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
     setStatusMessage("Analizando...");
     
     try {
-        const base64Data = imagePreview.split(',')[1];
+        const base64Data = await getBase64Data();
+        if (!base64Data) {
+            alert("No se pudo obtener datos de la imagen.");
+            setIsAnalyzing(false);
+            setStatusMessage(null);
+            return;
+        }
+
         const result = await analyzeMattressImage(base64Data);
         
         if (result) {
@@ -108,6 +151,7 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
         }
     } catch(e) {
         console.error("Auto detect failed", e);
+        alert("Error al analizar imagen.");
     } finally {
         setIsAnalyzing(false);
         setStatusMessage(null);
@@ -235,6 +279,24 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           
+          {/* VISUAL REFERENCE OF ITEM (For Edit Mode or after Selection) */}
+          {imagePreview && (
+              <div className="flex justify-center mb-6">
+                  <div className="relative w-full h-48 border-4 border-black rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] group">
+                      <img src={imagePreview} alt="Item" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end justify-center pb-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <button 
+                             type="button" 
+                             onClick={() => setStep(1)}
+                             className="bg-white text-black border-2 border-black px-3 py-1 font-bangers tracking-wider text-lg hover:scale-105 transition-transform flex items-center gap-2 shadow-sm"
+                           >
+                              <Camera size={18} /> CAMBIAR FOTO
+                           </button>
+                      </div>
+                  </div>
+              </div>
+          )}
+
           {/* AUTO FILL BUTTON - Only show if NOT editing (adding new) */}
           {!initialItem && (
             <button

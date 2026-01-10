@@ -1,32 +1,32 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 const SCENE_STYLES = [
-    "una tienda de colchones de lujo moderna",
-    "un dormitorio minimalista estilo japonés",
-    "un loft industrial con paredes de ladrillo",
-    "una habitación infantil colorida estilo cómic",
-    "un showroom elegante con iluminación de neón",
-    "una habitación rústica con vigas de madera",
-    "un espacio futurista de alta tecnología",
-    "una habitación de hotel de 5 estrellas",
-    "un estudio de fotografía profesional",
-    "una habitación acogedora con luz de atardecer"
+    "una tienda de colchones boutique con iluminación de estudio suave",
+    "un dormitorio principal minimalista de diseño escandinavo",
+    "un loft industrial luminoso con paredes de ladrillo visto",
+    "una habitación de invitados serena y decorada en tonos neutros",
+    "un showroom de muebles de diseño con grandes ventanales",
+    "una casa de campo moderna con vigas de madera expuestas",
+    "un apartamento urbano de lujo con vistas a la ciudad",
+    "una suite de hotel de 5 estrellas impecable",
+    "un estudio de fotografía profesional con fondo infinito blanco",
+    "un dormitorio acogedor estilo 'hygge' con luz natural suave"
 ];
 
 const FLOOR_TYPES = [
-    "suelo de madera noble pulida",
-    "alfombra blanca mullida",
-    "suelo de mármol brillante",
-    "piso de concreto pulido moderno",
-    "suelo de baldosas estilo ajedrez"
+    "suelo de madera de roble de tablones anchos",
+    "alfombra de lana tejida de color crema",
+    "suelo de mármol blanco Carrara pulido",
+    "piso de microcemento alisado gris cálido",
+    "suelo de grandes baldosas de piedra natural mate"
 ];
 
 const DECORATIONS = [
-    "con una planta verde grande al lado",
-    "con un póster de arte pop en la pared",
-    "con una lámpara de pie moderna encendida",
-    "con una ventana grande mostrando la ciudad",
-    "con carteles de 'OFERTA' estilo cómic al fondo"
+    "con una planta Ficus lyrata alta en una maceta de cerámica",
+    "con arte abstracto minimalista y enmarcado en la pared",
+    "con una mesita de noche de madera maciza y una lámpara de diseño",
+    "con cortinas de lino translúcido suavizando la luz de la ventana",
+    "con una manta de punto grueso doblada a los pies de la cama"
 ];
 
 // Helper to safely get the API key in both Vite (browser) and Node environments
@@ -44,6 +44,62 @@ const getApiKey = () => {
     return undefined;
 };
 
+// Helper: Compress and Resize Image to avoid 400 Errors (Payload too large / Invalid Argument)
+// Returns raw base64 string (without data: prefix) representing a JPEG
+const prepareImageForAPI = async (base64Input: string): Promise<string> => {
+    if (typeof window === 'undefined') return base64Input; // Server-side guard
+    
+    // Guard clause to prevent crash if input is undefined/null/empty
+    if (!base64Input || typeof base64Input !== 'string') {
+        throw new Error("Invalid or empty image data provided to Gemini service.");
+    }
+
+    return new Promise((resolve) => {
+        const img = new Image();
+        // Handle both raw base64 and data URI
+        img.src = base64Input.startsWith('data:') ? base64Input : `data:image/jpeg;base64,${base64Input}`;
+
+        img.onload = () => {
+            const MAX_DIMENSION = 1024; // Gemini handles 1024x1024 well
+            let width = img.width;
+            let height = img.height;
+
+            // Resize if too big
+            if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+                if (width > height) {
+                    height = Math.round((height * MAX_DIMENSION) / width);
+                    width = MAX_DIMENSION;
+                } else {
+                    width = Math.round((width * MAX_DIMENSION) / height);
+                    height = MAX_DIMENSION;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+                // Fallback to original if canvas fails
+                resolve(base64Input.startsWith('data:') ? base64Input.split(',')[1] : base64Input);
+                return;
+            }
+
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Convert to JPEG with 0.8 quality to reduce size
+            const newDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            resolve(newDataUrl.split(',')[1]);
+        };
+
+        img.onerror = () => {
+            console.warn("Image compression failed, sending original.");
+            resolve(base64Input.startsWith('data:') ? base64Input.split(',')[1] : base64Input);
+        };
+    });
+};
+
 export const generateScenePrompt = async (imageBase64?: string): Promise<string> => {
     const fallback = () => {
         const style = SCENE_STYLES[Math.floor(Math.random() * SCENE_STYLES.length)];
@@ -57,13 +113,16 @@ export const generateScenePrompt = async (imageBase64?: string): Promise<string>
     if (!imageBase64 || !apiKey) return fallback();
 
     try {
+        // Compress image before sending
+        const optimizedImage = await prepareImageForAPI(imageBase64);
+        
         const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: {
                 parts: [
-                    { text: "Generate a creative, short prompt to place this mattress in a stunning, stylized environment (like a comic book backroom, luxury penthouse, or neon warehouse). Describe the flooring, lighting, and decor. Keep it concise." },
-                    { inlineData: { mimeType: "image/jpeg", data: imageBase64 } }
+                    { text: "Generate a creative, short prompt to place this mattress in a stunning, high-end realistic environment (like a luxury bedroom, scandinavian loft, or bright showroom). Describe the flooring, lighting, and decor. Keep it concise." },
+                    { inlineData: { mimeType: "image/jpeg", data: optimizedImage } }
                 ]
             }
         });
@@ -81,13 +140,15 @@ export const analyzeMattressImage = async (imageBase64: string): Promise<{ brand
      if (!apiKey) return null;
      
      try {
+        const optimizedImage = await prepareImageForAPI(imageBase64);
+
         const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: {
                 parts: [
                     { text: "Analyze this mattress image. Identify the likely Brand (guess if unsure), Size (Twin, Twin XL, Full, Queen, King, Cal King), Condition (Nuevo (Plástico), Como Nuevo, Bueno, Con Detalles), and estimate a generous resale Price (USD number). Return JSON." },
-                    { inlineData: { mimeType: "image/jpeg", data: imageBase64 } }
+                    { inlineData: { mimeType: "image/jpeg", data: optimizedImage } }
                 ]
             },
             config: {
@@ -119,9 +180,10 @@ export const enhanceMattressImage = async (imageBase64: string, prompt: string):
             throw new Error("API Key missing");
         }
 
+        const optimizedImage = await prepareImageForAPI(imageBase64);
         const ai = new GoogleGenAI({ apiKey });
         
-        // Using gemini-2.5-flash-image for general image editing tasks as per guidance
+        // Using gemini-2.5-flash-image for general image editing tasks
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: {
@@ -130,7 +192,7 @@ export const enhanceMattressImage = async (imageBase64: string, prompt: string):
                     { 
                         inlineData: { 
                             mimeType: "image/jpeg", 
-                            data: imageBase64 
+                            data: optimizedImage 
                         } 
                     }
                 ]
