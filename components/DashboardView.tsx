@@ -42,8 +42,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView
       try {
           await inventoryService.delete(saleToDelete);
           // The subscription in App.tsx will auto-refresh inventory
-          // We close the modal immediately or after a short delay? 
-          // Since the item will vanish from the list, closing immediately is fine.
           setSaleToDelete(null); 
       } catch (e) {
           console.error("Failed to delete sale record", e);
@@ -90,18 +88,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView
                     ) : (
                         // Sort by most recent
                         soldItems.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).map(item => (
-                            <div key={item.id} className="bg-white border-2 border-black p-3 rounded shadow-[3px_3px_0px_0px_rgba(0,0,0,0.2)] flex justify-between items-center">
-                                <div>
+                            <div key={item.id} className="bg-white border-2 border-black p-3 rounded shadow-[3px_3px_0px_0px_rgba(0,0,0,0.2)] flex gap-3 items-center">
+                                {/* Image Thumbnail */}
+                                <div className="w-16 h-16 bg-gray-100 border-2 border-black shrink-0 overflow-hidden">
+                                    {item.image ? (
+                                        <img src={item.image} alt={item.brand} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                            <Box size={20} />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Text Details */}
+                                <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1 text-xs font-bold text-gray-400 mb-1">
                                         <Calendar size={10} />
                                         {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Fecha desc.'}
                                     </div>
-                                    <div className="font-bangers text-lg leading-none text-black">{item.brand}</div>
-                                    <div className="text-xs font-bold uppercase text-gray-500 mt-1">
+                                    <div className="font-bangers text-lg leading-none text-black truncate">{item.brand}</div>
+                                    <div className="text-xs font-bold uppercase text-gray-500 mt-1 truncate">
                                         {item.size} • {item.customerName || 'Cliente Anónimo'}
                                     </div>
                                 </div>
-                                <div className="flex flex-col items-end gap-1">
+
+                                {/* Price & Actions */}
+                                <div className="flex flex-col items-end gap-1 shrink-0">
                                     <span className="font-bangers text-2xl text-[#FF6D00]">${item.price}</span>
                                     <div className="flex items-center gap-2">
                                         <span className="text-[10px] font-bold bg-gray-200 px-1 rounded border border-black">
