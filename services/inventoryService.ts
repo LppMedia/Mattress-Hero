@@ -28,6 +28,7 @@ const DUMMY_DATA: InventoryItem[] = [
     status: 'Sold',
     storageLocation: 'Unit 8',
     customerName: 'Tony Stark',
+    customerPhone: '555-0199',
     deliveryMethod: 'Delivery',
     deliveryAddress: '10880 Malibu Point, CA',
     created_at: new Date(Date.now() - 86400000).toISOString(),

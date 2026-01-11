@@ -22,16 +22,30 @@ export default function MattressHeroApp() {
 
   // --- Auth State Listener ---
   useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
-      setIsAuthenticated(!!session);
+    // Check active session with error handling for invalid tokens
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.warn("Session check error:", error.message);
+        // If the refresh token is missing or invalid, ensure we clear local state so user can re-login
+        supabase.auth.signOut();
+        setUser(null);
+        setIsAuthenticated(false);
+      } else {
+        setUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
+        setIsAuthenticated(!!session);
+      }
     });
 
     // Listen for changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
-      setIsAuthenticated(!!session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Handle explicit sign out or other events
+      if (event === 'SIGNED_OUT') {
+         setUser(null);
+         setIsAuthenticated(false);
+      } else {
+         setUser(session?.user ? { id: session.user.id, email: session.user.email } : null);
+         setIsAuthenticated(!!session);
+      }
     });
 
     return () => subscription.unsubscribe();

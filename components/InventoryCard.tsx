@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, DollarSign, Trash2, MapPin, Truck, CheckCircle, Edit, RefreshCw, ArrowRightLeft, Sun, X, AlertCircle, ChevronDown, ChevronUp, Square, CheckSquare } from 'lucide-react';
+import { Box, DollarSign, Trash2, MapPin, Truck, CheckCircle, Edit, RefreshCw, ArrowRightLeft, Sun, X, AlertCircle, ChevronDown, ChevronUp, Square, CheckSquare, Phone } from 'lucide-react';
 import { InventoryItem } from '../types';
 import { inventoryService } from '../services/inventoryService';
 
@@ -35,6 +35,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
 
     const [saleForm, setSaleForm] = useState({
         customerName: '',
+        customerPhone: '',
         deliveryMethod: 'Pickup' as 'Pickup' | 'Delivery',
         deliveryAddress: '',
         salePrice: item.price.toString() // Initialize with current price
@@ -96,6 +97,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
              const { error } = await inventoryService.update(targetId, { 
                  status: 'Sold',
                  customerName: saleForm.customerName,
+                 customerPhone: saleForm.customerPhone,
                  deliveryMethod: saleForm.deliveryMethod,
                  deliveryAddress: saleForm.deliveryAddress,
                  price: isNaN(finalPrice) ? item.price : finalPrice, // Update the price to the negotiated amount
@@ -276,6 +278,17 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                         value={saleForm.customerName}
                         onChange={e => setSaleForm({...saleForm, customerName: e.target.value})}
                     />
+
+                    <div className="relative">
+                        <Phone className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                        <input 
+                            type="tel"
+                            placeholder="Teléfono (Opcional)"
+                            className="w-full border-2 border-black p-2 pl-9 font-bold focus:ring-[#FF6D00] outline-none"
+                            value={saleForm.customerPhone}
+                            onChange={e => setSaleForm({...saleForm, customerPhone: e.target.value})}
+                        />
+                    </div>
                     
                     <div className="flex gap-2">
                         {['Pickup', 'Delivery'].map(method => (
@@ -455,6 +468,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                     <div className="bg-blue-50 border-t-4 border-black p-2 text-xs font-bold font-sans">
                         <div className="flex items-center gap-1 text-blue-800">
                             <span className="font-bangers text-sm">CLIENTE:</span> {item.customerName || 'N/A'}
+                            {item.customerPhone && <span className="text-[10px] text-gray-500 font-normal ml-1">({item.customerPhone})</span>}
                         </div>
                         <div className="flex items-center gap-1 text-gray-600 mt-1">
                             {item.deliveryMethod === 'Delivery' ? <Truck size={12}/> : <CheckCircle size={12}/>}

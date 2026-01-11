@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Wand2, Trash2, User, Truck, MapPin, Sparkles } from 'lucide-react';
+import { Camera, Wand2, Trash2, User, Truck, MapPin, Sparkles, Phone } from 'lucide-react';
 import { AppUser, ViewState, InventoryItem } from '../types';
 import { ComicText, ComicButton } from './UIComponents';
 import { enhanceMattressImage, generateScenePrompt, analyzeMattressImage } from '../services/geminiService';
@@ -23,6 +23,7 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
     storageLocation: '',
     status: 'Available' as 'Available' | 'Sold' | 'Delivered',
     customerName: '',
+    customerPhone: '',
     deliveryMethod: 'Pickup' as 'Pickup' | 'Delivery',
     deliveryAddress: ''
   });
@@ -42,6 +43,7 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
               storageLocation: initialItem.storageLocation || '',
               status: initialItem.status,
               customerName: initialItem.customerName || '',
+              customerPhone: initialItem.customerPhone || '',
               deliveryMethod: initialItem.deliveryMethod || 'Pickup',
               deliveryAddress: initialItem.deliveryAddress || ''
           });
@@ -387,13 +389,23 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
              <div className="space-y-3 bg-gray-50 p-3 rounded border-2 border-black">
                 <div>
                      <label className="font-bold text-xs uppercase text-gray-500 block mb-1">Nombre del Cliente</label>
-                     <div className="flex items-center bg-white border-2 border-black p-2">
+                     <div className="flex items-center bg-white border-2 border-black p-2 mb-2">
                          <User size={16} className="text-gray-400 mr-2" />
                          <input 
                            value={formData.customerName}
                            onChange={e => setFormData({...formData, customerName: e.target.value})}
                            className="w-full font-bold outline-none text-black"
                            placeholder="Nombre completo..."
+                         />
+                     </div>
+                     <div className="flex items-center bg-white border-2 border-black p-2">
+                         <Phone size={16} className="text-gray-400 mr-2" />
+                         <input 
+                           type="tel"
+                           value={formData.customerPhone}
+                           onChange={e => setFormData({...formData, customerPhone: e.target.value})}
+                           className="w-full font-bold outline-none text-black"
+                           placeholder="Teléfono..."
                          />
                      </div>
                 </div>

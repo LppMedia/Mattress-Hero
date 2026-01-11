@@ -12,6 +12,7 @@ export interface InventoryItem {
   // New Fields
   storageLocation?: string;
   customerName?: string;
+  customerPhone?: string;
   deliveryMethod?: 'Pickup' | 'Delivery';
   deliveryAddress?: string;
   sold_at?: string; // Tracks when the item was actually sold

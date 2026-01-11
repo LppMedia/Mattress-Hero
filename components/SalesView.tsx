@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Sun, CheckSquare, X, DollarSign, Box, Truck, AlertCircle } from 'lucide-react';
+import { Search, Sun, CheckSquare, X, DollarSign, Box, Truck, AlertCircle, Phone } from 'lucide-react';
 import { InventoryItem } from '../types';
 import { InventoryCard } from './InventoryCard';
 import { ComicText } from './UIComponents';
@@ -23,6 +23,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
     // Bulk Form State
     const [bulkForm, setBulkForm] = useState({
         customerName: '',
+        customerPhone: '',
         deliveryMethod: 'Pickup' as 'Pickup' | 'Delivery',
         deliveryAddress: '',
         totalPrice: ''
@@ -109,6 +110,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
                         status: 'Sold',
                         sold_at: new Date().toISOString(),
                         customerName: bulkForm.customerName,
+                        customerPhone: bulkForm.customerPhone,
                         deliveryMethod: bulkForm.deliveryMethod,
                         deliveryAddress: bulkForm.deliveryAddress,
                         price: newPrice
@@ -121,6 +123,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
                     status: 'Sold',
                     sold_at: new Date().toISOString(),
                     customerName: bulkForm.customerName,
+                    customerPhone: bulkForm.customerPhone,
                     deliveryMethod: bulkForm.deliveryMethod,
                     deliveryAddress: bulkForm.deliveryAddress,
                 });
@@ -129,7 +132,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
             setShowBulkSellModal(false);
             setIsSelectionMode(false);
             setSelectedIds(new Set());
-            setBulkForm({ customerName: '', deliveryMethod: 'Pickup', deliveryAddress: '', totalPrice: '' });
+            setBulkForm({ customerName: '', customerPhone: '', deliveryMethod: 'Pickup', deliveryAddress: '', totalPrice: '' });
         } catch (e) {
             console.error(e);
             alert("Error al procesar venta masiva");
@@ -262,6 +265,17 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
                                 onChange={e => setBulkForm({...bulkForm, customerName: e.target.value})}
                             />
                             
+                            <div className="relative">
+                                <Phone className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                                <input 
+                                    type="tel"
+                                    placeholder="Teléfono (Opcional)"
+                                    className="w-full border-2 border-black p-2 pl-9 font-bold focus:ring-[#00E676] outline-none"
+                                    value={bulkForm.customerPhone}
+                                    onChange={e => setBulkForm({...bulkForm, customerPhone: e.target.value})}
+                                />
+                            </div>
+
                             <div className="flex gap-2">
                                 {['Pickup', 'Delivery'].map(method => (
                                     <button
