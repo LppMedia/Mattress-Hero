@@ -212,7 +212,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         return (
             <div className="bg-yellow-50 border-4 border-black rounded-xl p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] relative z-20">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bangers text-xl flex items-center gap-2">
+                    <h3 className="font-bangers text-xl flex items-center gap-2 text-black">
                         <MapPin className="text-[#6200EA]" /> 
                         {isStack ? "MOVER 1 UNIDAD A:" : "MOVER ÍTEM A:"}
                     </h3>

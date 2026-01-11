@@ -240,7 +240,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, onEdit 
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowBulkMoveModal(false)}>
                     <div className="bg-yellow-50 border-4 border-black rounded-xl p-4 shadow-[8px_8px_0px_0px_#6200EA] w-full max-w-sm flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-4 shrink-0">
-                            <h3 className="font-bangers text-2xl flex items-center gap-2">
+                            <h3 className="font-bangers text-2xl flex items-center gap-2 text-black">
                                 <MapPin className="text-[#6200EA]" /> 
                                 MOVER {selectedIds.size} ITEMS A:
                             </h3>
