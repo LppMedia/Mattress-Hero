@@ -183,6 +183,19 @@ export const inventoryService = {
      return res;
   },
 
+  async bulkUpdate(ids: string[], updates: Partial<InventoryItem>) {
+     if (isOffline) {
+        const current = getLocalData();
+        const updated = current.map(i => ids.includes(i.id) ? { ...i, ...updates } : i);
+        setLocalData(updated);
+        return { error: null };
+     }
+     
+     const res = await supabase.from('inventory').update(updates).in('id', ids).select();
+     if (!res.error) window.dispatchEvent(new Event('inventory-change'));
+     return res;
+  },
+
   async delete(id: string) {
       if (isOffline) {
         const current = getLocalData();

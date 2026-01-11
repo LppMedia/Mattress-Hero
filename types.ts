@@ -14,6 +14,7 @@ export interface InventoryItem {
   customerName?: string;
   deliveryMethod?: 'Pickup' | 'Delivery';
   deliveryAddress?: string;
+  sold_at?: string; // Tracks when the item was actually sold
 }
 
 export type ViewState = 'dashboard' | 'inventory' | 'add' | 'sales' | 'edit';

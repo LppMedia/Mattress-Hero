@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, DollarSign, Trash2, MapPin, Truck, CheckCircle, Edit, RefreshCw, ArrowRightLeft, Sun, X, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Box, DollarSign, Trash2, MapPin, Truck, CheckCircle, Edit, RefreshCw, ArrowRightLeft, Sun, X, AlertCircle, ChevronDown, ChevronUp, Square, CheckSquare } from 'lucide-react';
 import { InventoryItem } from '../types';
 import { inventoryService } from '../services/inventoryService';
 
@@ -9,9 +9,23 @@ interface InventoryCardProps {
     isSalesMode?: boolean;
     onEdit?: (item: InventoryItem) => void;
     isChild?: boolean; // New prop to style inner items differently
+    
+    // Selection Props
+    isSelectionMode?: boolean;
+    isSelected?: boolean;
+    onToggleSelection?: (ids: string[]) => void;
 }
 
-export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems = [], isSalesMode, onEdit, isChild = false }) => {
+export const InventoryCard: React.FC<InventoryCardProps> = ({ 
+    item, 
+    groupedItems = [], 
+    isSalesMode, 
+    onEdit, 
+    isChild = false,
+    isSelectionMode = false,
+    isSelected = false,
+    onToggleSelection
+}) => {
     const [isSelling, setIsSelling] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isMoving, setIsMoving] = useState(false); 
@@ -31,8 +45,13 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
     const stackCount = groupedItems.length > 0 ? groupedItems.length : 1;
     const isStack = stackCount > 1;
     
-    // Quick locations for the Move modal
-    const QUICK_LOCATIONS = ["Flea Market", "Showroom", "Unit 1", "Unit 2", "Unit 3", "Unit 4", "Unit 5"];
+    // Updated Quick locations
+    const QUICK_LOCATIONS = [
+        "Flea Market", "Showroom", 
+        "Unit 5", "Unit 7", "Unit 8", "Unit 12", "Unit 13", "Unit 15", 
+        "Unit 16", "Unit 22", "Unit 28", "Unit 31", "Unit 34", "Unit 36", 
+        "Unit 37", "Unit 43", "Unit 45", "Unit 45 2"
+    ];
 
     // Helper: Get the ID to operate on (pop one from stack if multiple, otherwise use item.id)
     const getTargetId = () => {
@@ -43,6 +62,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
     }
 
     const toggleExpand = (e: React.MouseEvent) => {
+        if (isSelectionMode) return; // Disable expand when selecting
         if (!isStack) return;
         // Don't toggle if clicking buttons
         if ((e.target as HTMLElement).closest('button')) return;
@@ -50,6 +70,15 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
         e.preventDefault();
         e.stopPropagation();
         setIsExpanded(!isExpanded);
+    };
+
+    const handleSelectionClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onToggleSelection) {
+            // Select all items in this group
+            const ids = groupedItems.length > 0 ? groupedItems.map(i => i.id) : [item.id];
+            onToggleSelection(ids);
+        }
     };
 
     const handleConfirmSale = async (e: React.FormEvent) => {
@@ -69,7 +98,8 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                  customerName: saleForm.customerName,
                  deliveryMethod: saleForm.deliveryMethod,
                  deliveryAddress: saleForm.deliveryAddress,
-                 price: isNaN(finalPrice) ? item.price : finalPrice // Update the price to the negotiated amount
+                 price: isNaN(finalPrice) ? item.price : finalPrice, // Update the price to the negotiated amount
+                 sold_at: new Date().toISOString() // Track exact sale time
              });
              
              if (error) throw error;
@@ -195,7 +225,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                     </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto comic-scroll pr-1">
                     {QUICK_LOCATIONS.map(loc => (
                         <button
                             key={loc}
@@ -216,7 +246,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                     <p className="text-xs font-bold text-gray-500 mb-1">OTRA UBICACIÓN:</p>
                     <input 
                         placeholder="Escribe ubicación..." 
-                        className="w-full border-2 border-black p-1 text-sm font-bold"
+                        className="w-full border-2 border-black p-1 text-sm font-bold text-black"
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                                 handleMoveLocation((e.target as HTMLInputElement).value);
@@ -297,7 +327,22 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
 
     // --- NORMAL CARD ---
     return (
-        <div className={`relative ${isChild ? 'ml-6 mb-2' : ''}`}>
+        <div className={`relative ${isChild ? 'ml-6 mb-2' : ''} ${isSelectionMode ? 'pl-8' : ''}`}>
+            
+            {/* SELECTION CHECKBOX - Appears on left if selection mode is active */}
+            {isSelectionMode && !isChild && (
+                <div 
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -ml-8 w-8 h-full flex items-center justify-center cursor-pointer z-30"
+                    onClick={handleSelectionClick}
+                >
+                    {isSelected ? (
+                        <CheckSquare size={28} className="text-[#6200EA] fill-white" strokeWidth={3} />
+                    ) : (
+                        <Square size={28} className="text-gray-400" strokeWidth={3} />
+                    )}
+                </div>
+            )}
+
             {showDeleteModal && <DeleteModal />}
             
             {/* Visual connector line for child items */}
@@ -314,14 +359,15 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
             )}
 
             <div 
-                onClick={toggleExpand}
+                onClick={isSelectionMode ? handleSelectionClick : toggleExpand}
                 className={`
                     relative bg-white border-4 border-black rounded-xl overflow-hidden
                     ${isChild ? 'shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] border-2 scale-[0.98]' : 'shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]'}
                     transition-all duration-300 z-10
-                    ${!isAvailable ? 'bg-gray-50' : isStack ? 'cursor-pointer hover:-translate-y-1' : ''}
+                    ${!isAvailable ? 'bg-gray-50' : (isStack || isSelectionMode) ? 'cursor-pointer hover:-translate-y-1' : ''}
                     ${isDeleting ? 'opacity-50 pointer-events-none' : ''}
                     ${isExpanded ? 'mb-4' : ''}
+                    ${isSelected ? 'ring-4 ring-[#6200EA] ring-offset-2' : ''}
                 `}
             >
                 {/* Status Badge */}
@@ -344,7 +390,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                         )}
                         
                         {/* Stack Count Badge on Image */}
-                        {isStack && !isChild && (
+                        {isStack && !isChild && !isSelectionMode && (
                              <div className="absolute top-1 right-1 bg-[#6200EA] text-white border-2 border-black px-1.5 font-bangers text-lg shadow-sm z-20 flex items-center gap-1">
                                  {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
                                  x{stackCount}
@@ -417,8 +463,8 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                     </div>
                 )}
 
-                {/* Actions Footer - If expanded, we generally hide buttons on parent to avoid confusion, 
-                    OR we keep them as "Action on First Available". Keeping them for now but specific cards inside work too. */}
+                {/* Actions Footer - Hidden in Selection Mode to avoid misclicks */}
+                {!isSelectionMode && (
                 <div className="bg-gray-50 border-t-4 border-black p-2 flex gap-2">
                     {isAvailable ? (
                         isSalesMode ? (
@@ -492,6 +538,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({ item, groupedItems
                         </>
                     )}
                 </div>
+                )}
             </div>
 
             {/* EXPANDED CHILDREN LIST */}

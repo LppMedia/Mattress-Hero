@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, DollarSign, Database, X, Calendar, ClipboardList, Trash2, AlertCircle } from 'lucide-react';
+import { Box, DollarSign, Database, X, Calendar, ClipboardList, Trash2, AlertCircle, MapPin, Clock } from 'lucide-react';
 import { InventoryItem, ViewState } from '../types';
 import { ComicText, ComicButton, StatCard } from './UIComponents';
 import { inventoryService } from '../services/inventoryService';
@@ -12,6 +12,7 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView }) => {
   const [seeding, setSeeding] = useState(false);
   const [showSalesHistory, setShowSalesHistory] = useState(false);
+  const [salesFilter, setSalesFilter] = useState<'all' | 'week'>('all');
   
   // State for deletion logic
   const [saleToDelete, setSaleToDelete] = useState<string | null>(null);
@@ -20,8 +21,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView
   const totalItems = inventory.filter(i => i.status === 'Available').length;
   
   // Sold Items Logic
-  const soldItems = inventory.filter(i => i.status === 'Sold' || i.status === 'Delivered');
-  const totalSoldValue = soldItems.reduce((sum, item) => sum + item.price, 0);
+  const allSoldItems = inventory.filter(i => i.status === 'Sold' || i.status === 'Delivered');
+
+  // Filter sold items based on selection
+  const filteredSoldItems = allSoldItems.filter(item => {
+      if (salesFilter === 'all') return true;
+      
+      // Weekly Logic: Last 7 Days
+      // Use sold_at if available, otherwise fallback to created_at (for demo data or older records)
+      const dateStr = item.sold_at || item.created_at; 
+      if (!dateStr) return false;
+      
+      const itemDate = new Date(dateStr);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      return itemDate >= sevenDaysAgo;
+  });
+
+  const displayedTotalValue = filteredSoldItems.reduce((sum, item) => sum + item.price, 0);
 
   // Stock Calculation Logic
   const sizes = ['Twin', 'Twin XL', 'Full', 'Queen', 'King', 'Cal King'];
@@ -70,24 +88,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView
                     </button>
                 </div>
 
+                {/* Filter Tabs */}
+                <div className="flex border-b-4 border-black bg-gray-100">
+                    <button 
+                        onClick={() => setSalesFilter('all')}
+                        className={`flex-1 py-2 font-bangers tracking-wide text-lg flex justify-center items-center gap-2 transition-colors ${salesFilter === 'all' ? 'bg-white text-black' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}
+                    >
+                       <Database size={16} /> TODOS (HISTÓRICO)
+                    </button>
+                    <button 
+                        onClick={() => setSalesFilter('week')}
+                        className={`flex-1 py-2 font-bangers tracking-wide text-lg flex justify-center items-center gap-2 border-l-2 border-black transition-colors ${salesFilter === 'week' ? 'bg-white text-black' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}
+                    >
+                       <Clock size={16} /> ÚLTIMOS 7 DÍAS
+                    </button>
+                </div>
+
                 {/* Total Banner */}
                 <div className="bg-green-100 p-3 border-b-4 border-black text-center">
-                    <span className="font-bold text-gray-600 text-sm uppercase">Total Generado</span>
+                    <span className="font-bold text-gray-600 text-sm uppercase">
+                        {salesFilter === 'week' ? 'Generado esta Semana' : 'Total Generado Histórico'}
+                    </span>
                     <div className="font-bangers text-4xl text-[#00E676] drop-shadow-[1px_1px_0_#000]">
-                        ${totalSoldValue.toLocaleString()}
+                        ${displayedTotalValue.toLocaleString()}
                     </div>
                 </div>
 
                 {/* Scrollable List */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-yellow-50">
-                    {soldItems.length === 0 ? (
+                    {filteredSoldItems.length === 0 ? (
                         <div className="text-center opacity-50 mt-10">
-                            <div className="font-bangers text-xl">SIN VENTAS AÚN</div>
-                            <p className="text-sm font-bold">¡Empieza a vender para llenar este historial!</p>
+                            <div className="font-bangers text-xl">SIN VENTAS</div>
+                            <p className="text-sm font-bold">
+                                {salesFilter === 'week' 
+                                    ? 'No hay ventas en los últimos 7 días.' 
+                                    : '¡Empieza a vender para llenar este historial!'
+                                }
+                            </p>
                         </div>
                     ) : (
                         // Sort by most recent
-                        soldItems.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).map(item => (
+                        filteredSoldItems.sort((a, b) => new Date(b.sold_at || b.created_at || 0).getTime() - new Date(a.sold_at || a.created_at || 0).getTime()).map(item => (
                             <div key={item.id} className="bg-white border-2 border-black p-3 rounded shadow-[3px_3px_0px_0px_rgba(0,0,0,0.2)] flex gap-3 items-center">
                                 {/* Image Thumbnail */}
                                 <div className="w-16 h-16 bg-gray-100 border-2 border-black shrink-0 overflow-hidden">
@@ -104,12 +145,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1 text-xs font-bold text-gray-400 mb-1">
                                         <Calendar size={10} />
-                                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Fecha desc.'}
+                                        {/* Show sold date if available, else created date */}
+                                        {item.sold_at 
+                                            ? new Date(item.sold_at).toLocaleDateString() 
+                                            : (item.created_at ? new Date(item.created_at).toLocaleDateString() : 'Fecha desc.')
+                                        }
+                                        {item.sold_at && <span className="bg-green-100 text-green-800 px-1 rounded text-[9px]">VENDIDO</span>}
                                     </div>
                                     <div className="font-bangers text-lg leading-none text-black truncate">{item.brand}</div>
                                     <div className="text-xs font-bold uppercase text-gray-500 mt-1 truncate">
                                         {item.size} • {item.customerName || 'Cliente Anónimo'}
                                     </div>
+                                    {/* Address Display for Delivery items */}
+                                    {item.deliveryMethod === 'Delivery' && item.deliveryAddress && (
+                                        <div className="text-[10px] font-bold text-gray-600 mt-1 flex items-start gap-1 bg-gray-50 p-1 rounded border border-gray-200">
+                                            <MapPin size={10} className="mt-0.5 shrink-0 text-red-500" />
+                                            <span className="leading-tight line-clamp-2">{item.deliveryAddress}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Price & Actions */}
@@ -190,7 +243,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView
         {/* Made clickable to show history */}
         <StatCard 
             title="Ventas Totales" 
-            value={soldItems.length} 
+            value={allSoldItems.length} 
             icon={DollarSign} 
             color="bg-[#00E676]" 
             onClick={() => setShowSalesHistory(true)}
