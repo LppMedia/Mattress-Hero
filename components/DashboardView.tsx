@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, DollarSign, Database, X, Calendar, ClipboardList, Trash2, AlertCircle, MapPin, Clock } from 'lucide-react';
+import { Box, DollarSign, Database, X, Calendar, ClipboardList, Trash2, AlertCircle, MapPin, Clock, Phone, Edit } from 'lucide-react';
 import { InventoryItem, ViewState } from '../types';
 import { ComicText, ComicButton, StatCard } from './UIComponents';
 import { inventoryService } from '../services/inventoryService';
@@ -7,9 +7,10 @@ import { inventoryService } from '../services/inventoryService';
 interface DashboardViewProps {
   inventory: InventoryItem[];
   setView: (view: ViewState) => void;
+  onEdit?: (item: InventoryItem) => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView, onEdit }) => {
   const [seeding, setSeeding] = useState(false);
   const [showSalesHistory, setShowSalesHistory] = useState(false);
   const [salesFilter, setSalesFilter] = useState<'all' | 'week'>('all');
@@ -156,6 +157,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView
                                     <div className="text-xs font-bold uppercase text-gray-500 mt-1 truncate">
                                         {item.size} • {item.customerName || 'Cliente Anónimo'}
                                     </div>
+                                    {/* SHOW PHONE NUMBER FOR VERIFICATION */}
+                                    {item.customerPhone && (
+                                        <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 mt-1">
+                                            <Phone size={10} /> {item.customerPhone}
+                                        </div>
+                                    )}
+
                                     {/* Address Display for Delivery items */}
                                     {item.deliveryMethod === 'Delivery' && item.deliveryAddress && (
                                         <div className="text-[10px] font-bold text-gray-600 mt-1 flex items-start gap-1 bg-gray-50 p-1 rounded border border-gray-200">
@@ -172,13 +180,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ inventory, setView
                                         <span className="text-[10px] font-bold bg-gray-200 px-1 rounded border border-black">
                                             {item.deliveryMethod === 'Delivery' ? 'ENVÍO' : 'RETIRO'}
                                         </span>
+                                        
+                                        {/* EDIT BUTTON (New) */}
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onEdit?.(item);
+                                            }}
+                                            className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200 transition-all"
+                                            title="Editar / Corregir Venta"
+                                        >
+                                            <Edit size={16} />
+                                        </button>
+
+                                        {/* DELETE BUTTON */}
                                         <button 
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSaleToDelete(item.id);
                                             }}
                                             className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded border border-transparent hover:border-red-200 transition-all"
-                                            title="Eliminar registro"
+                                            title="Eliminar registro permanentemente"
                                         >
                                             <Trash2 size={16} />
                                         </button>

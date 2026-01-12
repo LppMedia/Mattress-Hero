@@ -207,8 +207,22 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
       
       setView('inventory');
     } catch (err: any) {
-      console.error('Error saving item:', err.message || JSON.stringify(err));
-      alert(`¡Error! ${err.message || 'Desconocido'}`);
+      console.error('Error saving item:', err);
+      // Ensure msg is always a string to prevent [object Object]
+      let msg = "Error Desconocido";
+      if (typeof err === 'string') {
+          msg = err;
+      } else if (err?.message) {
+          if (typeof err.message === 'string') msg = err.message;
+          else msg = JSON.stringify(err.message);
+      } else {
+          try {
+             msg = JSON.stringify(err);
+          } catch (e) {
+             msg = "Unserializable Error Object";
+          }
+      }
+      alert(`¡Error! ${msg}`);
     } finally {
       setLoading(false);
       setStatusMessage(null);

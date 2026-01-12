@@ -38,7 +38,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         customerPhone: '',
         deliveryMethod: 'Pickup' as 'Pickup' | 'Delivery',
         deliveryAddress: '',
-        salePrice: item.price.toString() // Initialize with current price
+        salePrice: item.price ? item.price.toString() : '0'
     });
 
     const isSold = item.status === 'Sold';
@@ -46,7 +46,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
     const stackCount = groupedItems.length > 0 ? groupedItems.length : 1;
     const isStack = stackCount > 1;
     
-    // Updated Quick locations
     const QUICK_LOCATIONS = [
         "Flea Market", "Showroom", 
         "Unit 5", "Unit 7", "Unit 8", "Unit 12", "Unit 13", "Unit 15", 
@@ -54,20 +53,14 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         "Unit 37", "Unit 43", "Unit 45", "Unit 45 2"
     ];
 
-    // Helper: Get the ID to operate on (pop one from stack if multiple, otherwise use item.id)
     const getTargetId = () => {
-        // If it's a stack (Parent) and we perform an action, we usually target the first one 
-        // OR we rely on the expanded view to target specific IDs. 
-        // For the main card quick-actions, we target the first available.
         return groupedItems.length > 0 ? groupedItems[0].id : item.id;
     }
 
     const toggleExpand = (e: React.MouseEvent) => {
-        if (isSelectionMode) return; // Disable expand when selecting
+        if (isSelectionMode) return;
         if (!isStack) return;
-        // Don't toggle if clicking buttons
         if ((e.target as HTMLElement).closest('button')) return;
-        
         e.preventDefault();
         e.stopPropagation();
         setIsExpanded(!isExpanded);
@@ -76,7 +69,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
     const handleSelectionClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (onToggleSelection) {
-            // Select all items in this group
             const ids = groupedItems.length > 0 ? groupedItems.map(i => i.id) : [item.id];
             onToggleSelection(ids);
         }
@@ -85,32 +77,71 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
     const handleConfirmSale = async (e: React.FormEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        
         setIsProcessing(true);
 
-        try {
-             // We only sell ONE item from the stack
-             const targetId = getTargetId();
-             
-             const finalPrice = parseFloat(saleForm.salePrice);
+        const targetId = getTargetId();
+        const finalPrice = parseFloat(saleForm.salePrice);
+        const safePrice = isNaN(finalPrice) ? item.price : finalPrice;
 
-             const { error } = await inventoryService.update(targetId, { 
-                 status: 'Sold',
-                 customerName: saleForm.customerName,
-                 customerPhone: saleForm.customerPhone,
-                 deliveryMethod: saleForm.deliveryMethod,
-                 deliveryAddress: saleForm.deliveryAddress,
-                 price: isNaN(finalPrice) ? item.price : finalPrice, // Update the price to the negotiated amount
-                 sold_at: new Date().toISOString() // Track exact sale time
-             });
+        const fullPayload = { 
+             status: 'Sold' as const,
+             customerName: saleForm.customerName,
+             customerPhone: saleForm.customerPhone,
+             deliveryMethod: saleForm.deliveryMethod,
+             deliveryAddress: saleForm.deliveryAddress,
+             price: safePrice, 
+             sold_at: new Date().toISOString()
+        };
+
+        try {
+             // ATTEMPT 1: Full Update
+             const { error } = await inventoryService.update(targetId, fullPayload);
              
-             if (error) throw error;
+             if (error) {
+                 // SPECIFIC CHECK FOR ARRAY TYPE ERROR (22P02)
+                 if (error.code === '22P02' && error.message?.includes('malformed array literal')) {
+                     alert("ERROR DE BASE DE DATOS CRÍTICO:\n\nLa columna 'customerPhone' está configurada como ARRAY en lugar de TEXTO.\n\nPor favor ejecuta el script SQL que incluye 'DROP COLUMN' para arreglarlo.");
+                     throw error; // Stop here, don't do fallbacks that hide the issue
+                 }
+                 throw error;
+             }
              
              setIsSelling(false);
-             // Success - component will unmount/update via parent list refresh
-        } catch(e) {
-            console.error(e);
-            alert("Error al registrar venta. Intenta nuevamente.");
+             alert("¡Venta registrada correctamente!");
+
+        } catch(err1: any) {
+             console.warn("Intento 1 falló", err1);
+             
+             // If it wasn't the critical array error, try fallbacks
+             if (err1?.code !== '22P02') {
+                 try {
+                     // ATTEMPT 2: Remove Phone
+                     const { customerPhone, ...noPhonePayload } = fullPayload;
+                     const { error: err2 } = await inventoryService.update(targetId, noPhonePayload);
+                     if (err2) throw err2;
+                     
+                     setIsSelling(false);
+                     alert("⚠️ Venta guardada sin teléfono. (Revisa tus columnas en Supabase).");
+                     return;
+
+                 } catch (err2: any) {
+                     // ATTEMPT 3: Basic
+                     try {
+                        const basicPayload = { status: 'Sold' as const, price: safePrice };
+                        const { error: err3 } = await inventoryService.update(targetId, basicPayload);
+                        if (err3) throw err3;
+                        setIsSelling(false);
+                        alert("⚠️ Venta guardada (MODO EMERGENCIA).");
+                        return;
+                     } catch(err3) {
+                         // Fall through to final error alert
+                     }
+                 }
+             }
+
+             let msg = err1?.message || "Error desconocido";
+             if (err1?.details) msg += ` (${err1.details})`;
+             alert(`Error al vender: ${msg}`);
         } finally {
             setIsProcessing(false);
         }
@@ -123,7 +154,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         }
     }
 
-    // Opens the retro modal instead of window.confirm
     const handleDeleteClick = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -131,29 +161,23 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         setShowDeleteModal(true);
     }
 
-    // The actual deletion logic called by the modal
     const confirmDelete = async () => {
          setShowDeleteModal(false);
          setIsDeleting(true);
          try {
-            // We only delete ONE item from the stack
             const targetId = getTargetId();
             const { error } = await inventoryService.delete(targetId);
-            if (error) {
-                console.error("Delete operation failed:", error);
-                alert("Error: Could not delete item. Check console for details.");
-                setIsDeleting(false);
-            }
+            if (error) throw error;
          } catch(e: any) {
-            console.error("Unexpected delete error:", e);
-            setIsDeleting(false);
-            alert(`Error: ${e.message || 'Unknown error'}`);
+            console.error("Delete error:", e);
+            alert(`Error: ${e.message || "No se pudo eliminar"}`);
+         } finally {
+             setIsDeleting(false);
          }
     }
 
     const handleMoveLocation = async (newLocation: string) => {
         try {
-            // We only move ONE item from the stack
             const targetId = getTargetId();
             await inventoryService.update(targetId, { storageLocation: newLocation });
             setIsMoving(false);
@@ -162,11 +186,9 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         }
     }
 
-    // --- RETRO DELETE MODAL ---
     const DeleteModal = () => (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[1px]" onClick={(e) => e.stopPropagation()}>
             <div className="w-[320px] bg-[#C0C0C0] border-t-2 border-l-2 border-t-white border-l-white border-b-2 border-r-2 border-b-black border-r-black shadow-2xl p-1 font-sans select-none" onClick={(e) => e.stopPropagation()}>
-                {/* Header */}
                 <div className="bg-[#000080] px-2 py-1 flex justify-between items-center mb-4 cursor-default">
                     <span className="text-white font-bold text-sm tracking-wide">Confirmación</span>
                     <button 
@@ -176,8 +198,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                         <X size={14} className="text-black" strokeWidth={3} />
                     </button>
                 </div>
-                
-                {/* Content */}
                 <div className="flex items-center gap-4 px-4 py-2 mb-6">
                     <div className="relative">
                         <AlertCircle size={42} className="text-red-600" strokeWidth={2.5} />
@@ -189,8 +209,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                         }
                     </p>
                 </div>
-
-                {/* Buttons */}
                 <div className="flex justify-center gap-6 mb-4">
                     <button 
                         onClick={confirmDelete}
@@ -209,7 +227,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         </div>
     );
 
-    // --- MOVE MODAL OVERLAY ---
     if (isMoving) {
         return (
             <div className="bg-yellow-50 border-4 border-black rounded-xl p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] relative z-20">
@@ -220,13 +237,11 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                     </h3>
                     <button onClick={() => setIsMoving(false)} className="text-gray-400 font-bold hover:text-black">X</button>
                 </div>
-                
                 {isStack && (
                     <div className="mb-2 text-xs font-bold text-gray-500 bg-white border border-black p-1">
                         📦 Moviendo 1 de {stackCount} ítems idénticos.
                     </div>
                 )}
-
                 <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto comic-scroll pr-1">
                     {QUICK_LOCATIONS.map(loc => (
                         <button
@@ -243,7 +258,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                         </button>
                     ))}
                 </div>
-                
                 <div className="mt-4 pt-2 border-t-2 border-dashed border-gray-400">
                     <p className="text-xs font-bold text-gray-500 mb-1">OTRA UBICACIÓN:</p>
                     <input 
@@ -260,7 +274,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         )
     }
 
-    // --- SALE FORM OVERLAY ---
     if (isSelling) {
         return (
             <div className="bg-white border-4 border-black rounded-xl p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] relative z-20">
@@ -314,7 +327,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                         />
                     )}
 
-                    {/* NEW PRICE INPUT */}
                     <div>
                         <label className="font-bangers block mb-1 text-sm text-[#FF6D00]">PRECIO FINAL ($)</label>
                         <input
@@ -338,11 +350,8 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         )
     }
 
-    // --- NORMAL CARD ---
     return (
         <div className={`relative ${isChild ? 'ml-6 mb-2' : ''} ${isSelectionMode ? 'pl-8' : ''}`}>
-            
-            {/* SELECTION CHECKBOX - Appears on left if selection mode is active */}
             {isSelectionMode && !isChild && (
                 <div 
                     className="absolute left-0 top-1/2 -translate-y-1/2 -ml-8 w-8 h-full flex items-center justify-center cursor-pointer z-30"
@@ -358,15 +367,9 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
 
             {showDeleteModal && <DeleteModal />}
             
-            {/* Visual connector line for child items */}
-            {isChild && (
-                <div className="absolute -left-4 top-1/2 w-4 h-[2px] bg-black border-b-2 border-black"></div>
-            )}
-            {isChild && (
-                <div className="absolute -left-4 -top-6 bottom-1/2 w-[2px] bg-black"></div>
-            )}
+            {isChild && <div className="absolute -left-4 top-1/2 w-4 h-[2px] bg-black border-b-2 border-black"></div>}
+            {isChild && <div className="absolute -left-4 -top-6 bottom-1/2 w-[2px] bg-black"></div>}
 
-            {/* STACK EFFECT BACKGROUND (Only for Top Level Stacks when collapsed) */}
             {isStack && !isExpanded && !isChild && (
                  <div className="mx-2 -mb-28 h-32 bg-gray-800 border-4 border-black rounded-xl translate-y-2 relative z-0"></div>
             )}
@@ -383,7 +386,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                     ${isSelected ? 'ring-4 ring-[#6200EA] ring-offset-2' : ''}
                 `}
             >
-                {/* Status Badge */}
                 <div className={`
                     absolute top-3 right-3 z-10 px-3 py-1 border-2 border-black font-bangers rotate-3 shadow-md
                     ${isAvailable ? 'bg-[#00E676] text-black' : isSold ? 'bg-[#FF6D00] text-white' : 'bg-gray-800 text-white'}
@@ -392,7 +394,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                 </div>
 
                 <div className="flex h-32">
-                    {/* Image Section */}
                     <div className="w-1/3 border-r-4 border-black relative bg-gray-100 overflow-hidden group">
                         {item.image ? (
                             <img src={item.image} className={`w-full h-full object-cover ${!isAvailable ? 'grayscale' : ''}`} alt="Mattress" />
@@ -401,8 +402,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                                 <Box className="text-gray-300" />
                             </div>
                         )}
-                        
-                        {/* Stack Count Badge on Image */}
                         {isStack && !isChild && !isSelectionMode && (
                              <div className="absolute top-1 right-1 bg-[#6200EA] text-white border-2 border-black px-1.5 font-bangers text-lg shadow-sm z-20 flex items-center gap-1">
                                  {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
@@ -411,7 +410,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                         )}
                     </div>
 
-                    {/* Details Section */}
                     <div className="w-2/3 p-3 flex flex-col justify-between">
                         <div>
                             <div className="flex justify-between items-start pr-20">
@@ -422,8 +420,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                                     {item.brand}
                                 </h3>
                             </div>
-                            
-                            {/* Quantity Indicator in Details */}
                              {isStack && !isChild && (
                                 <div className="flex items-center gap-1 mt-1">
                                     <span className="text-xs font-bold text-gray-500">CANTIDAD:</span>
@@ -433,19 +429,14 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                                     </span>
                                 </div>
                             )}
-
-                            {/* Show specific SKU if it is a child or single item */}
                             {(isChild || !isStack) && (
                                 <div className="text-[10px] font-bold bg-gray-100 inline-block px-1 border border-gray-300 mt-1 text-gray-500">
                                     ID: {item.sku || 'N/A'}
                                 </div>
                             )}
-
                             <p className="font-bold text-gray-500 text-sm uppercase mt-1">{item.size} • {item.condition}</p>
-                            
                         </div>
                         
-                        {/* Combined Location & Price Row */}
                         <div className="flex items-end justify-between mt-1">
                              <div>
                                 {item.storageLocation && (
@@ -455,7 +446,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                                     </div>
                                 )}
                              </div>
-
                             <span className={`font-bangers text-3xl drop-shadow-[1px_1px_0_#000] leading-none ${isAvailable ? 'text-[#FF6D00]' : 'text-gray-500'}`}>
                                 ${item.price}
                             </span>
@@ -463,7 +453,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                     </div>
                 </div>
 
-                {/* Sold Details Section (Visible only if Sold/Delivered) */}
                 {!isAvailable && (
                     <div className="bg-blue-50 border-t-4 border-black p-2 text-xs font-bold font-sans">
                         <div className="flex items-center gap-1 text-blue-800">
@@ -477,7 +466,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                     </div>
                 )}
 
-                {/* Actions Footer - Hidden in Selection Mode to avoid misclicks */}
                 {!isSelectionMode && (
                 <div className="bg-gray-50 border-t-4 border-black p-2 flex gap-2">
                     {isAvailable ? (
@@ -491,7 +479,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                             </button>
                         ) : (
                             <>
-                                {/* Move Button */}
                                 <button 
                                     type="button"
                                     onClick={() => setIsMoving(true)}
@@ -500,7 +487,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                                 >
                                     <ArrowRightLeft size={16} />
                                 </button>
-
                                 <button 
                                     type="button"
                                     onClick={() => onEdit?.(item)}
@@ -530,7 +516,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                                     <Truck size={16} /> ENTREGADO?
                                 </button>
                             )}
-                            
                             <button 
                                 type="button"
                                 onClick={() => onEdit?.(item)}
@@ -539,7 +524,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                             >
                                 <Edit size={16} />
                             </button>
-
                             <button 
                                 type="button"
                                 onClick={handleDeleteClick}
@@ -555,17 +539,14 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                 )}
             </div>
 
-            {/* EXPANDED CHILDREN LIST */}
             {isExpanded && isStack && (
                 <div className="pl-4 pr-1 mt-2 space-y-3 animate-fade-in relative z-0">
-                    {/* Dashed connector line */}
                     <div className="absolute left-0 top-0 bottom-6 w-0.5 bg-black border-l-2 border-dashed border-gray-400"></div>
-
                     {groupedItems.map((subItem) => (
                         <InventoryCard
                             key={subItem.id}
                             item={subItem}
-                            groupedItems={[]} // IMPORTANT: Pass empty array so children act as single items
+                            groupedItems={[]}
                             isSalesMode={isSalesMode}
                             onEdit={onEdit}
                             isChild={true}

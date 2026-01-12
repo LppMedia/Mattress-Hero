@@ -88,6 +88,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
         setSelectedIds(newSet);
     };
 
+    // --- THE ACTION THAT HAPPENS WHEN WE SELL ---
     const handleBulkSellConfirm = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsProcessing(true);
@@ -97,45 +98,80 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
             const totalSoldPrice = parseFloat(bulkForm.totalPrice);
             const originalTotal = selectedItems.reduce((sum, i) => sum + i.price, 0);
             
-            // If total price is modified, we distribute the ratio across items
-            // If originalTotal is 0 (unlikely but possible), avoid division by zero
+            // Calculate price ratio
             const ratio = originalTotal > 0 ? totalSoldPrice / originalTotal : 1;
-            const hasPriceChange = Math.abs(totalSoldPrice - originalTotal) > 0.5; // Tolerance for float math
+            const hasPriceChange = Math.abs(totalSoldPrice - originalTotal) > 0.5;
 
-            if (hasPriceChange) {
-                // Update items individually with adjusted prices
-                const promises = selectedItems.map(item => {
-                    const newPrice = Math.round(item.price * ratio);
-                    return inventoryService.update(item.id, {
-                        status: 'Sold',
-                        sold_at: new Date().toISOString(),
-                        customerName: bulkForm.customerName,
-                        customerPhone: bulkForm.customerPhone,
-                        deliveryMethod: bulkForm.deliveryMethod,
-                        deliveryAddress: bulkForm.deliveryAddress,
-                        price: newPrice
+            // Base Payload
+            const basePayload = {
+                status: 'Sold' as const,
+                sold_at: new Date().toISOString(),
+                customerName: bulkForm.customerName,
+                customerPhone: bulkForm.customerPhone,
+                deliveryMethod: bulkForm.deliveryMethod,
+                deliveryAddress: bulkForm.deliveryAddress,
+            };
+
+            const performUpdate = async (level: 'full' | 'no-phone' | 'ultra-basic') => {
+                 let payload: any = { ...basePayload };
+                 
+                 // Strip fields based on retry level
+                 if (level === 'no-phone') {
+                     const { customerPhone, ...rest } = payload;
+                     payload = rest;
+                 } else if (level === 'ultra-basic') {
+                     // EXTREME FALLBACK: remove sold_at to fix PGRST204 errors
+                     // Also remove customer fields just in case
+                     payload = {
+                         status: 'Sold'
+                     };
+                 }
+
+                 if (hasPriceChange) {
+                     const promises = selectedItems.map(item => {
+                        const newPrice = Math.round(item.price * ratio);
+                        return inventoryService.update(item.id, { ...payload, price: newPrice });
                     });
-                });
-                await Promise.all(promises);
-            } else {
-                // Bulk update with original prices (unchanged)
-                await inventoryService.bulkUpdate(Array.from(selectedIds), {
-                    status: 'Sold',
-                    sold_at: new Date().toISOString(),
-                    customerName: bulkForm.customerName,
-                    customerPhone: bulkForm.customerPhone,
-                    deliveryMethod: bulkForm.deliveryMethod,
-                    deliveryAddress: bulkForm.deliveryAddress,
-                });
+                    await Promise.all(promises);
+                 } else {
+                     // Bulk update
+                     const { error } = await inventoryService.bulkUpdate(Array.from(selectedIds), payload);
+                     if (error) throw error;
+                 }
             }
 
+            // Retry Logic
+            try {
+                // Attempt 1: Full
+                await performUpdate('full');
+            } catch (err1: any) {
+                console.warn("Bulk retry 1 failed (Full)", err1);
+                try {
+                    // Attempt 2: No Phone
+                    await performUpdate('no-phone');
+                    alert("⚠️ Venta procesada sin teléfonos (El formato de teléfono en DB es incorrecto).");
+                } catch (err2: any) {
+                    console.warn("Bulk retry 2 failed (No Phone)", err2);
+                    try {
+                        // Attempt 3: No sold_at
+                        await performUpdate('ultra-basic');
+                        alert("⚠️ Venta procesada (MODO EMERGENCIA). No se guardaron fechas ni clientes. (Falta columna sold_at en DB).");
+                    } catch (err3) {
+                        throw err3; // Fail completely
+                    }
+                }
+            }
+
+            // Success Reset
             setShowBulkSellModal(false);
             setIsSelectionMode(false);
             setSelectedIds(new Set());
             setBulkForm({ customerName: '', customerPhone: '', deliveryMethod: 'Pickup', deliveryAddress: '', totalPrice: '' });
-        } catch (e) {
+            
+        } catch (e: any) {
             console.error(e);
-            alert("Error al procesar venta masiva");
+            let msg = e?.message || "Error desconocido";
+            alert(`Error al procesar venta masiva: ${msg}`);
         } finally {
             setIsProcessing(false);
         }
@@ -172,7 +208,6 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
                         onChange={e => setSearchTerm(e.target.value)}
                     />
                 </div>
-                {/* Flea Market Filter Toggle */}
                 <button
                     onClick={() => setOnlyFleaMarket(!onlyFleaMarket)}
                     className={`
@@ -185,7 +220,6 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
                     <span className="text-[9px] font-bold leading-none mt-1">FLEA MKT</span>
                 </button>
 
-                {/* Selection Mode Toggle */}
                 <button
                     onClick={toggleSelectionMode}
                     className={`
@@ -227,7 +261,6 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
                 )}
             </div>
 
-            {/* FLOATING ACTION BAR FOR BULK SELL */}
             {isSelectionMode && selectedIds.size > 0 && (
                 <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-11/12 max-w-md z-40 animate-fade-in">
                     <div className="bg-black text-white p-3 rounded-xl border-4 border-white shadow-xl flex justify-between items-center">
@@ -245,7 +278,6 @@ export const SalesView: React.FC<SalesViewProps> = ({ inventory, onEdit }) => {
                 </div>
             )}
 
-            {/* BULK SELL MODAL */}
             {showBulkSellModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowBulkSellModal(false)}>
                     <div className="bg-white border-4 border-black rounded-xl p-4 shadow-[8px_8px_0px_0px_#00E676] w-full max-w-sm relative" onClick={e => e.stopPropagation()}>

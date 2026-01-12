@@ -128,7 +128,7 @@ export default function MattressHeroApp() {
 
       {/* Main Content Area */}
       <main className="relative z-10 p-4 max-w-md mx-auto">
-        {view === 'dashboard' && <DashboardView inventory={inventory} setView={setView} />}
+        {view === 'dashboard' && <DashboardView inventory={inventory} setView={setView} onEdit={handleEditItem} />}
         {view === 'inventory' && <InventoryView inventory={inventory} onEdit={handleEditItem} />}
         {view === 'add' && <AddItemView user={user} setView={setView} />}
         {view === 'edit' && <AddItemView user={user} setView={setView} initialItem={editingItem} />}
