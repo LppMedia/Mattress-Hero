@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Wand2, Trash2, User, Truck, MapPin, Sparkles, Phone } from 'lucide-react';
+import { Camera, Wand2, Trash2, User, Truck, MapPin, Sparkles, Phone, Layers } from 'lucide-react';
 import { AppUser, ViewState, InventoryItem } from '../types';
 import { ComicText, ComicButton } from './UIComponents';
 import { enhanceMattressImage, generateScenePrompt, analyzeMattressImage } from '../services/geminiService';
@@ -14,6 +14,7 @@ interface AddItemViewProps {
 export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initialItem }) => {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(initialItem ? 2 : 1); // Skip photo step if editing
+  const [quantity, setQuantity] = useState(1); // Quantity state for bulk creation
   const [formData, setFormData] = useState({
     sku: `SKU-${Math.floor(Math.random()*10000)}`,
     size: 'Queen',
@@ -48,6 +49,7 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
               deliveryAddress: initialItem.deliveryAddress || ''
           });
           setImagePreview(initialItem.image || null);
+          setQuantity(1); // Reset quantity when editing
       }
   }, [initialItem]);
   
@@ -196,13 +198,20 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
       };
 
       if (initialItem) {
-          // UPDATE MODE
+          // UPDATE MODE (Single Item)
           const { error } = await inventoryService.update(initialItem.id, payload);
           if (error) throw error;
       } else {
-          // CREATE MODE
-          const { error } = await inventoryService.add(payload);
-          if (error) throw error;
+          // CREATE MODE (Possibly Multiple)
+          if (quantity > 1) {
+             const items = Array.from({ length: quantity }).map(() => ({ ...payload }));
+             const { error } = await inventoryService.addMultiple(items);
+             if (error) throw error;
+             alert(`¡${quantity} items creados exitosamente!`);
+          } else {
+             const { error } = await inventoryService.add(payload);
+             if (error) throw error;
+          }
       }
       
       setView('inventory');
@@ -383,14 +392,35 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
              </div>
           </div>
 
-          <div>
-             <label className="font-bangers block mb-1">UBICACIÓN / UNIDAD</label>
-             <input 
-               value={formData.storageLocation}
-               onChange={e => setFormData({...formData, storageLocation: e.target.value})}
-               className="w-full bg-yellow-50 text-black border-2 border-black p-2 font-bold text-lg placeholder-gray-400 focus:ring-2 focus:ring-[#FF6D00] focus:outline-none"
-               placeholder="Ej. Unit 8, Pasillo B"
-             />
+          {/* QUANTITY AND LOCATION ROW */}
+          <div className="flex gap-4">
+            <div className="flex-1">
+                 <label className="font-bangers block mb-1">UBICACIÓN / UNIDAD</label>
+                 <input 
+                   value={formData.storageLocation}
+                   onChange={e => setFormData({...formData, storageLocation: e.target.value})}
+                   className="w-full bg-yellow-50 text-black border-2 border-black p-2 font-bold text-lg placeholder-gray-400 focus:ring-2 focus:ring-[#FF6D00] focus:outline-none"
+                   placeholder="Ej. Unit 8"
+                 />
+            </div>
+            
+            {/* ONLY SHOW QUANTITY IF NOT EDITING */}
+            {!initialItem && (
+                <div className="w-1/3">
+                    <div className="flex items-center gap-1 mb-1">
+                        <Layers size={14} className="text-[#6200EA]" />
+                        <label className="font-bangers text-[#6200EA]">CANTIDAD</label>
+                    </div>
+                    <input 
+                       type="number"
+                       min="1"
+                       max="50"
+                       value={quantity}
+                       onChange={e => setQuantity(parseInt(e.target.value) || 1)}
+                       className="w-full bg-white text-black border-2 border-black p-2 font-bold text-lg focus:ring-2 focus:ring-[#6200EA] focus:outline-none text-center"
+                    />
+                </div>
+            )}
           </div>
 
           {/* Delivery & Customer Info Section */}
@@ -472,7 +502,7 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
                 {initialItem ? 'CANCELAR' : 'ATRÁS'}
             </ComicButton>
             <ComicButton type="submit" variant="accent" className="w-2/3" disabled={loading}>
-                {loading ? (statusMessage || "PROCESANDO...") : (initialItem ? "ACTUALIZAR" : "GUARDAR")}
+                {loading ? (statusMessage || "PROCESANDO...") : (initialItem ? "ACTUALIZAR" : (quantity > 1 ? `CREAR (${quantity})` : "GUARDAR"))}
             </ComicButton>
           </div>
         </form>

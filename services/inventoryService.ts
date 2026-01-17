@@ -172,6 +172,30 @@ export const inventoryService = {
     return { data, error };
   },
 
+  async addMultiple(items: Omit<InventoryItem, 'id' | 'created_at'>[]) {
+    if (isOffline) {
+        const newItems: InventoryItem[] = items.map(item => ({
+            ...item,
+            id: crypto.randomUUID(),
+            created_at: new Date().toISOString()
+        }));
+        const current = getLocalData();
+        setLocalData([...newItems, ...current]);
+        return { error: null };
+    }
+
+    const { data, error } = await supabase.from('inventory').insert(items).select();
+
+    if (error) {
+        console.warn("Bulk insert failed, falling back to local storage:", error.message);
+        isOffline = true; 
+        return this.addMultiple(items); // Retry locally
+    } else {
+        window.dispatchEvent(new Event('inventory-change'));
+    }
+    return { data, error };
+  },
+
   async update(id: string, updates: Partial<InventoryItem>) {
      if (isOffline) {
         const current = getLocalData();
