@@ -29,3 +29,24 @@ export interface NavProps {
   view: ViewState;
   setView: (view: ViewState) => void;
 }
+
+export const STORAGE_LOCATIONS = [
+  "Flea Market", 
+  "Showroom", 
+  "Unit 5", 
+  "Unit 7", 
+  "Unit 8", 
+  "Unit 12", 
+  "Unit 13", 
+  "Unit 15", 
+  "Unit 16", 
+  "Unit 22", 
+  "Unit 28", 
+  "Unit 31", 
+  "Unit 34", 
+  "Unit 36", 
+  "Unit 37", 
+  "Unit 43", 
+  "Unit 45", 
+  "Unit 45 2"
+];

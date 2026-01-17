@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, DollarSign, Trash2, MapPin, Truck, CheckCircle, Edit, RefreshCw, ArrowRightLeft, Sun, X, AlertCircle, ChevronDown, ChevronUp, Square, CheckSquare, Phone } from 'lucide-react';
-import { InventoryItem } from '../types';
+import { InventoryItem, STORAGE_LOCATIONS } from '../types';
 import { inventoryService } from '../services/inventoryService';
 
 interface InventoryCardProps {
@@ -45,13 +45,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
     const isAvailable = item.status === 'Available';
     const stackCount = groupedItems.length > 0 ? groupedItems.length : 1;
     const isStack = stackCount > 1;
-    
-    const QUICK_LOCATIONS = [
-        "Flea Market", "Showroom", 
-        "Unit 5", "Unit 7", "Unit 8", "Unit 12", "Unit 13", "Unit 15", 
-        "Unit 16", "Unit 22", "Unit 28", "Unit 31", "Unit 34", "Unit 36", 
-        "Unit 37", "Unit 43", "Unit 45", "Unit 45 2"
-    ];
 
     const getTargetId = () => {
         return groupedItems.length > 0 ? groupedItems[0].id : item.id;
@@ -98,10 +91,9 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
              const { error } = await inventoryService.update(targetId, fullPayload);
              
              if (error) {
-                 // SPECIFIC CHECK FOR ARRAY TYPE ERROR (22P02)
                  if (error.code === '22P02' && error.message?.includes('malformed array literal')) {
                      alert("ERROR DE BASE DE DATOS CRÍTICO:\n\nLa columna 'customerPhone' está configurada como ARRAY en lugar de TEXTO.\n\nPor favor ejecuta el script SQL que incluye 'DROP COLUMN' para arreglarlo.");
-                     throw error; // Stop here, don't do fallbacks that hide the issue
+                     throw error; 
                  }
                  throw error;
              }
@@ -112,7 +104,6 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
         } catch(err1: any) {
              console.warn("Intento 1 falló", err1);
              
-             // If it wasn't the critical array error, try fallbacks
              if (err1?.code !== '22P02') {
                  try {
                      // ATTEMPT 2: Remove Phone
@@ -134,7 +125,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                         alert("⚠️ Venta guardada (MODO EMERGENCIA).");
                         return;
                      } catch(err3) {
-                         // Fall through to final error alert
+                         // Fall through
                      }
                  }
              }
@@ -243,7 +234,7 @@ export const InventoryCard: React.FC<InventoryCardProps> = ({
                     </div>
                 )}
                 <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto comic-scroll pr-1">
-                    {QUICK_LOCATIONS.map(loc => (
+                    {STORAGE_LOCATIONS.map(loc => (
                         <button
                             key={loc}
                             onClick={() => handleMoveLocation(loc)}

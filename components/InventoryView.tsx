@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { InventoryItem } from '../types';
+import { InventoryItem, STORAGE_LOCATIONS } from '../types';
 import { InventoryCard } from './InventoryCard';
 import { MapPin, Ruler, CheckSquare, X, ArrowRightLeft, Sun } from 'lucide-react';
 import { inventoryService } from '../services/inventoryService';
@@ -16,31 +16,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, onEdit 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [showBulkMoveModal, setShowBulkMoveModal] = useState(false);
     
-    // Updated Quick locations
-    const QUICK_LOCATIONS = [
-        "Flea Market", "Showroom", 
-        "Unit 5", "Unit 7", "Unit 8", "Unit 12", "Unit 13", "Unit 15", 
-        "Unit 16", "Unit 22", "Unit 28", "Unit 31", "Unit 34", "Unit 36", 
-        "Unit 37", "Unit 43", "Unit 45", "Unit 45 2"
-    ];
-
-    // Dynamically extract unique locations from current inventory
-    const locationOptions = useMemo(() => {
-        const locations = new Set(
-            inventory
-                .filter(i => i.status === 'Available') // Only consider locations of available items
-                .map(i => i.storageLocation)
-                .filter((l): l is string => typeof l === 'string' && l.trim().length > 0)
-        );
-        return ['Todos', ...Array.from(locations).sort()];
-    }, [inventory]);
+    // Use the standardized list + 'Todos'
+    const locationOptions = ['Todos', ...STORAGE_LOCATIONS];
 
     const filtered = inventory.filter(i => {
         // STRICT REQUIREMENT: Remove sold items from this view
         if (i.status !== 'Available') return false;
 
         const matchSize = sizeFilter === 'Todos' || i.size === sizeFilter;
-        const matchLocation = locationFilter === 'Todos' || i.storageLocation === locationFilter;
+        
+        // Normalize comparison to handle whitespace or casing issues in legacy data
+        const itemLoc = i.storageLocation ? i.storageLocation.trim() : '';
+        const matchLocation = locationFilter === 'Todos' || itemLoc === locationFilter;
+        
         return matchSize && matchLocation;
     });
 
@@ -146,7 +134,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, onEdit 
                 
                 {/* Size Filter Row */}
                 <div className="mb-3">
-                    {/* Changed hide-scrollbar to comic-scroll and increased padding-bottom */}
                     <div className="flex overflow-x-auto pb-4 gap-2 comic-scroll">
                         {['Todos', 'Twin', 'Twin XL', 'Full', 'Queen', 'King', 'Cal King'].map(f => (
                             <button 
@@ -163,30 +150,27 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, onEdit 
                     </div>
                 </div>
 
-                {/* Location Filter Row - Only shows if we have locations to filter */}
-                {locationOptions.length > 1 && (
-                    <div className="border-t-2 border-dashed border-gray-300 pt-2">
-                        <div className="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase mb-2">
-                            <MapPin size={12} />
-                            <span>Filtrar por Ubicación</span>
-                        </div>
-                        {/* Changed hide-scrollbar to comic-scroll and increased padding-bottom */}
-                        <div className="flex overflow-x-auto pb-4 gap-2 comic-scroll">
-                            {locationOptions.map(loc => (
-                                <button 
-                                    key={loc}
-                                    onClick={() => setLocationFilter(loc as string)}
-                                    className={`
-                                        px-3 py-1 border-2 border-black rounded-md font-bangers text-sm whitespace-nowrap transition-all flex-shrink-0
-                                        ${locationFilter === loc ? 'bg-[#FF6D00] text-white shadow-[2px_2px_0px_0px_#000]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
-                                    `}
-                                >
-                                    {loc}
-                                </button>
-                            ))}
-                        </div>
+                {/* Location Filter Row - Using Standardized List */}
+                <div className="border-t-2 border-dashed border-gray-300 pt-2">
+                    <div className="flex items-center gap-1 text-xs font-bold text-gray-500 uppercase mb-2">
+                        <MapPin size={12} />
+                        <span>Filtrar por Ubicación</span>
                     </div>
-                )}
+                    <div className="flex overflow-x-auto pb-4 gap-2 comic-scroll">
+                        {locationOptions.map(loc => (
+                            <button 
+                                key={loc}
+                                onClick={() => setLocationFilter(loc)}
+                                className={`
+                                    px-3 py-1 border-2 border-black rounded-md font-bangers text-sm whitespace-nowrap transition-all flex-shrink-0
+                                    ${locationFilter === loc ? 'bg-[#FF6D00] text-white shadow-[2px_2px_0px_0px_#000]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
+                                `}
+                            >
+                                {loc}
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </div>
 
             {/* Results List */}
@@ -248,7 +232,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ inventory, onEdit 
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2 overflow-y-auto comic-scroll pr-1">
-                            {QUICK_LOCATIONS.map(loc => (
+                            {STORAGE_LOCATIONS.map(loc => (
                                 <button
                                     key={loc}
                                     onClick={() => handleBulkMove(loc)}

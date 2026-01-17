@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Wand2, Trash2, User, Truck, MapPin, Sparkles, Phone, Layers } from 'lucide-react';
-import { AppUser, ViewState, InventoryItem } from '../types';
+import { AppUser, ViewState, InventoryItem, STORAGE_LOCATIONS } from '../types';
 import { ComicText, ComicButton } from './UIComponents';
 import { enhanceMattressImage, generateScenePrompt, analyzeMattressImage } from '../services/geminiService';
 import { inventoryService } from '../services/inventoryService';
@@ -21,7 +21,7 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
     brand: '',
     condition: 'Nuevo',
     price: '',
-    storageLocation: '',
+    storageLocation: 'Unit 5', // Default value from list
     status: 'Available' as 'Available' | 'Sold' | 'Delivered',
     customerName: '',
     customerPhone: '',
@@ -41,7 +41,7 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
               brand: initialItem.brand,
               condition: initialItem.condition,
               price: initialItem.price.toString(),
-              storageLocation: initialItem.storageLocation || '',
+              storageLocation: initialItem.storageLocation || 'Unit 5',
               status: initialItem.status,
               customerName: initialItem.customerName || '',
               customerPhone: initialItem.customerPhone || '',
@@ -396,12 +396,18 @@ export const AddItemView: React.FC<AddItemViewProps> = ({ user, setView, initial
           <div className="flex gap-4">
             <div className="flex-1">
                  <label className="font-bangers block mb-1">UBICACIÓN / UNIDAD</label>
-                 <input 
+                 
+                 {/* CHANGED TO SELECT FOR STANDARDIZATION */}
+                 <select
                    value={formData.storageLocation}
                    onChange={e => setFormData({...formData, storageLocation: e.target.value})}
-                   className="w-full bg-yellow-50 text-black border-2 border-black p-2 font-bold text-lg placeholder-gray-400 focus:ring-2 focus:ring-[#FF6D00] focus:outline-none"
-                   placeholder="Ej. Unit 8"
-                 />
+                   className="w-full bg-yellow-50 text-black border-2 border-black p-2 font-bold text-lg h-[48px] focus:ring-2 focus:ring-[#FF6D00] focus:outline-none"
+                 >
+                    {STORAGE_LOCATIONS.map(loc => (
+                        <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                    <option value="">Otra / Sin Asignar</option>
+                 </select>
             </div>
             
             {/* ONLY SHOW QUANTITY IF NOT EDITING */}
